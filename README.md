@@ -10,6 +10,7 @@ Kostenloser, datenschutzfreundlicher SEPA-XML Generator fuer Lastschriften (pain
 
 - **SEPA-Lastschrift** (Geld einziehen) - pain.008.001.02 / pain.008.001.08
 - **SEPA-Ueberweisung** (Geld senden) - pain.001.001.03 / pain.001.001.08 / pain.001.001.09
+- **Oesterreich** - Profile der PSA (Payment Services Austria): pain.001.001.09.austrian.005 / pain.008.001.08.austrian.004
 - **Excel-Upload** - Transaktionen per Excel-Datei (.xlsx/.xls) importieren
 - **Manuelle Eingabe** - Transaktionen einzeln hinzufuegen
 - **Konfiguration speichern/laden** - Bankdaten als JSON-Datei sichern
@@ -39,7 +40,8 @@ sepa-xml-generator/
 ├── style.css             # Styling (responsive Design, Animationen)
 ├── package.json          # Node.js-Konfiguration (nur fuer Tests)
 ├── tests/
-│   └── sepa.test.js      # Automatisierte Tests (83 Tests)
+│   ├── sepa.test.js      # Automatisierte Tests (277 Tests)
+│   └── xsd/              # ISO-Schemata, psa/ = Profile fuer Oesterreich
 └── README.md             # Diese Datei
 ```
 
@@ -50,6 +52,7 @@ sepa-xml-generator/
 |---|---|---|
 | pain.008.001.02 | Aeltere Version | Nur bei Kompatibilitaetsproblemen |
 | pain.008.001.08 | Aktuelle Version | Empfohlen |
+| pain.008.001.08.austrian.004 | PSA-Profil fuer Oesterreich (CORE + B2B) | Konto bei einer oesterreichischen Bank |
 
 ### Ueberweisung (Credit Transfer)
 | Format | Beschreibung | Empfehlung |
@@ -57,6 +60,26 @@ sepa-xml-generator/
 | pain.001.001.03 | Aeltere Version | Nur bei Kompatibilitaetsproblemen |
 | pain.001.001.08 | Neuere Version | - |
 | pain.001.001.09 | Neueste Version | Empfohlen |
+| pain.001.001.09.austrian.005 | PSA-Profil fuer Oesterreich | Konto bei einer oesterreichischen Bank |
+
+### Oesterreich (PSA)
+Oesterreichische Banken pruefen Einreichungen gegen die Spezifikation der
+[PSA Payment Services Austria](https://zv.psa.at/de/download/xml/kunde-bank/rb-2023/xml-schemata-2.html)
+(Regelwerk RB 2023). Die Profile fuehren keinen eigenen Namespace ein: Die Datei
+ist ein gewoehnliches pain.001.001.09 bzw. pain.008.001.08, das die PSA per
+`xs:redefine` einschraenkt. Unterschiede zur Standardausgabe:
+
+| | Standard (.09 / .08) | Oesterreich (PSA) |
+|---|---|---|
+| Umlaute, `& € @ § % ...` in Namen/Verwendungszweck | umgewandelt (ae/oe/ue, `&`->`+`) | bleiben erhalten |
+| Referenzen (EndToEndId, Mandatsreferenz) | Basiszeichensatz | Basiszeichensatz (Typ `Max35Text_REF`) |
+| Ueberweisung ohne Empfaenger-BIC | `<CdtrAgt>` mit `Othr/NOTPROVIDED` | `<CdtrAgt>` entfaellt (nur `BICFI` zulaessig) |
+| Adresse Auftraggeberseite (`Dbtr` bzw. `Cdtr` im PmtInf) | `Ctry` + `AdrLine` | entfaellt (nicht zulaessig) |
+| Adresse Gegenpartei | `Ctry` + `AdrLine` | strukturiert: `StrtNm`, `TwnNm` (max. 35), `Ctry` |
+| `xsi:schemaLocation` | `pain.001.001.09.xsd` | `ISO.pain.001.001.09.austrian.005.xsd` |
+
+Fuer alle Formate gilt: Referenzen beginnen und enden nicht mit `/` und enthalten
+kein `//` (EPC-Regel; das PSA-Schema prueft sie per Muster).
 
 ## Benutzung
 
@@ -184,7 +207,7 @@ unterscheiden sich in zwei Elementen von `.02`/`.03`:
 
 | | pain.008.001.02 / pain.001.001.03 | pain.008.001.08 / pain.001.001.08 / .09 |
 |---|---|---|
-| BIC in `<FinInstnId>` | `<BIC>` | `<BICFI>` |
+| BIC in `<FinInstnId>` | `<BIC>` | `<BICFI>` (auch in den PSA-Profilen) |
 | `<ReqdExctnDt>` (nur pain.001) | flache ISODate | `<ReqdExctnDt><Dt>...</Dt></ReqdExctnDt>` |
 
 Ein pauschales Ersetzen von `BIC` durch `BICFI` waere deshalb falsch -- es wuerde
@@ -211,7 +234,7 @@ npm install
 npm test
 ```
 
-### Testabdeckung (199 Tests)
+### Testabdeckung (277 Tests)
 | Suite | Beschreibung |
 |---|---|
 | Lastschrift x Formate | Alle pain.008-Formate mit verschiedenen Optionen |
@@ -225,10 +248,11 @@ npm test
 | Integration | Vollstaendige Ablauf-Simulationen |
 | Excel-Import | Spalten-Mapping, Datenverarbeitung, End-to-End |
 | BLZ->BIC-Ableitung | Bundesbank-Tabelle, Fallbacks |
-| **Schema-Validierung (XSD)** | Jedes erzeugte Dokument gegen das echte ISO-Schema |
+| **Schema-Validierung (XSD)** | Jedes erzeugte Dokument gegen das echte ISO- bzw. PSA-Schema |
 | BIC vs. BICFI | Formatabhaengiger Elementname |
 | ReqdExctnDt-Struktur | ISODate vs. DateAndDateTime2Choice |
-| SEPA-Zeichensatz | Umwandlung und Wirkung im XML |
+| SEPA-Zeichensatz | Umwandlung und Wirkung im XML, PSA-Profil, Referenzen (`toSepaId`) |
+| PSA-Profile | Formatzuordnung, Namespace, AT-spezifische Auslassungen |
 | Lastschrift-Art | CORE/B2B gueltig, COR1 abgelehnt |
 | Konfigurations-Migration | Gespeichertes COR1 wird auf CORE gehoben |
 
@@ -248,7 +272,18 @@ node tools/fetch-xsd.mjs
 Die eingecheckten Schemata sind die vom EPC veroeffentlichte **Core**-Variante
 (Typname `..._SDD_Core_C2PSP`). Sie lassen in `LclInstrm/Cd` ausschliesslich
 `CORE` zu; B2B-Lastschriften haben ein eigenes Schema, das die Bezugsquelle
-nicht anbietet, und werden deshalb strukturell statt per XSD geprueft.
+nicht anbietet, und werden deshalb strukturell statt per XSD geprueft. Im
+oesterreichischen Lastschrift-Profil ist B2B enthalten und wird dort per XSD
+validiert.
+
+Die PSA-Schemata fuer Oesterreich liegen **unveraendert** in `tests/xsd/psa/`
+(Profil, PSA-Fassung des Basisschemas, Codelisten). `fetch-xsd.mjs` laedt sie
+per `curl` und entpackt sie mit `unzip` -- Node-`fetch` scheitert an der
+unvollstaendigen Zertifikatskette des PSA-Servers. Die Profile sind **XSD 1.1**
+mit `xs:assert`, was `xmllint` nicht kann. Die Tests entfernen die Asserts
+deshalb in einer temporaeren Arbeitskopie und pruefen deren Regeln (Summen,
+Eindeutigkeit, "genau ein Kindelement" ...) separat in `assertPsaRules`. Eine
+Gegenprobe stellt sicher, dass `xmllint` das `xs:redefine` tatsaechlich anwendet.
 
 `xmllint` ist auf macOS vorinstalliert; unter Debian/Ubuntu liefert es
 `apt-get install libxml2-utils`. Fehlt es, wird die Suite sichtbar uebersprungen

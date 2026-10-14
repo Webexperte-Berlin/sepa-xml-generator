@@ -3,17 +3,25 @@ const assert = require('node:assert');
 const SEPA = require('../sepa.min.js');
 const BLZ_BIC = require('../blz-bic.js');   // Offizielle BLZ->BIC Tabelle (Bundesbank)
 
-// Spiegelt sepaText() aus sepa-generator.js: wandelt Freitext in den
-// SEPA-Zeichensatz um und kuerzt NUR, wenn erst die Umwandlung das Feld
-// ueberlaufen laesst. War die Eingabe schon zu lang, bleibt sie zu lang, damit
-// die Laengenpruefung der Library anschlaegt statt still abzuschneiden.
-function sepaText(value, maxLen) {
+// Spiegelt sepaText()/sepaId()/convertForSepa() aus sepa-generator.js: wandelt
+// Freitext bzw. Referenzen in den SEPA-Zeichensatz um und kuerzt NUR, wenn
+// erst die Umwandlung das Feld ueberlaufen laesst. War die Eingabe schon zu
+// lang, bleibt sie zu lang, damit die Laengenpruefung der Library anschlaegt
+// statt still abzuschneiden. painFormat bestimmt den Zeichensatz (AT: Umlaute
+// bleiben erhalten); Referenzen bleiben immer im Basiszeichensatz.
+function convertForSepa(value, maxLen, convert) {
   const original = (value === null || value === undefined ? '' : String(value)).trim();
-  const converted = SEPA.toSepaText(original);
+  const converted = convert(original);
   if (original.length <= maxLen && converted.length > maxLen) {
-    return SEPA.toSepaText(original, maxLen);
+    return convert(original, maxLen);
   }
   return converted;
+}
+function sepaText(value, maxLen, painFormat) {
+  return convertForSepa(value, maxLen, (s, n) => SEPA.toSepaText(s, n, painFormat));
+}
+function sepaId(value, maxLen) {
+  return convertForSepa(value, maxLen, SEPA.toSepaId);
 }
 
 // Spiegelt deriveBIC() aus sepa-generator.js: leitet den BIC aus einer
@@ -55,9 +63,12 @@ const SEQUENCE_TYPES        = ['FRST', 'RCUR', 'OOFF', 'FNAL'];
 // CORE hat die verkuerzte Vorlaufzeit uebernommen. Siehe Suite "Lastschrift-Art".
 const LOCAL_INSTRUMENTATIONS = ['CORE', 'B2B'];
 
-// All supported pain formats grouped by type
-const DD_FORMATS  = ['pain.008.001.02', 'pain.008.001.08'];
-const CT_FORMATS  = ['pain.001.001.03', 'pain.001.001.08', 'pain.001.001.09'];
+// All supported pain formats grouped by type – inkl. der oesterreichischen
+// PSA-Profile, damit jede Format-Suite sie automatisch mitprueft.
+const AT_CT_FORMAT = 'pain.001.001.09.austrian.005';
+const AT_DD_FORMAT = 'pain.008.001.08.austrian.004';
+const DD_FORMATS  = ['pain.008.001.02', 'pain.008.001.08', AT_DD_FORMAT];
+const CT_FORMATS  = ['pain.001.001.03', 'pain.001.001.08', 'pain.001.001.09', AT_CT_FORMAT];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -132,7 +143,8 @@ function createTransferDoc(painFormat, opts = {}) {
 function assertValidXML(xml, painFormat) {
   // Basic structural checks every SEPA XML must pass
   assert.ok(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>'), 'Missing XML declaration');
-  assert.ok(xml.includes(`xmlns="urn:iso:std:iso:20022:tech:xsd:${painFormat}"`), `Missing namespace for ${painFormat}`);
+  // PSA-Profile nutzen den Namespace ihres ISO-Basisformats
+  assert.ok(xml.includes(`xmlns="urn:iso:std:iso:20022:tech:xsd:${SEPA.basePainFormat(painFormat)}"`), `Missing namespace for ${painFormat}`);
   assert.ok(xml.includes('<GrpHdr>'), 'Missing GrpHdr element');
   assert.ok(xml.includes('<MsgId>'), 'Missing MsgId element');
   assert.ok(xml.includes('<CreDtTm>'), 'Missing CreDtTm element');
@@ -278,7 +290,13 @@ describe('Überweisung (Credit Transfer)', () => {
         });
         const xml = doc.toString();
         assertValidXML(xml, fmt);
-        assert.ok(xml.includes('NOTPROVIDED'), 'Missing NOTPROVIDED for empty BIC');
+        if (SEPA.isAustrianFormat(fmt)) {
+          // PSA: CdtrAgt erlaubt nur BICFI – ohne BIC entfaellt der Block
+          assert.ok(!xml.includes('<CdtrAgt>'), 'AT: CdtrAgt muss ohne BIC fehlen');
+        } else {
+          assert.ok(xml.includes('<CdtrAgt><FinInstnId><Othr><Id>NOTPROVIDED</Id></Othr></FinInstnId></CdtrAgt>'),
+            'Missing NOTPROVIDED for empty BIC');
+        }
       });
 
       it('enthält End-to-End-ID', () => {
@@ -847,16 +865,16 @@ function excelToXML(rows, paymentType, painFormat) {
 
     for (const t of transactions) {
       const txn = info.createTransaction();
-      txn.debtorName = sepaText(t.name, 70);
+      txn.debtorName = sepaText(t.name, 70, painFormat);
       txn.debtorIBAN = String(t.iban || '').toUpperCase();
       txn.debtorBIC = String(t.bic || '').toUpperCase() || deriveBIC(txn.debtorIBAN);
       txn.amount = parseFloat(t.amount);
-      txn.mandateId = sepaText(t.mandateId, 35);
+      txn.mandateId = sepaId(t.mandateId, 35);
       // end2endId muss auch bei DD gesetzt werden, sonst <EndToEndId/> leer.
-      txn.end2endId = sepaText(t.mandateId, 35) || 'NOTPROVIDED';
+      txn.end2endId = sepaId(t.mandateId, 35) || 'NOTPROVIDED';
       const d = t.mandateSignatureDate ? new Date(t.mandateSignatureDate) : new Date();
       txn.mandateSignatureDate = isNaN(d.getTime()) ? new Date() : d;
-      txn.remittanceInfo = sepaText(t.remittanceInfo, 140);
+      txn.remittanceInfo = sepaText(t.remittanceInfo, 140, painFormat);
       info.addTransaction(txn);
     }
   } else {
@@ -867,12 +885,12 @@ function excelToXML(rows, paymentType, painFormat) {
 
     for (const t of transactions) {
       const txn = info.createTransaction();
-      txn.creditorName = sepaText(t.name, 70);
+      txn.creditorName = sepaText(t.name, 70, painFormat);
       txn.creditorIBAN = String(t.iban || '').toUpperCase();
       txn.creditorBIC = String(t.bic || '').toUpperCase() || deriveBIC(txn.creditorIBAN);
       txn.amount = parseFloat(t.amount);
-      txn.remittanceInfo = sepaText(t.remittanceInfo, 140);
-      txn.end2endId = sepaText(t.mandateId, 35) || 'NOTPROVIDED';
+      txn.remittanceInfo = sepaText(t.remittanceInfo, 140, painFormat);
+      txn.end2endId = sepaId(t.mandateId, 35) || 'NOTPROVIDED';
       info.addTransaction(txn);
     }
   }
@@ -1678,11 +1696,13 @@ describe('BLZ->BIC-Ableitung (Bank-Kompatibilität)', () => {
 // Die XSDs liegen in tests/xsd/ (per tools/fetch-xsd.mjs aktualisierbar).
 
 const { execFileSync } = require('node:child_process');
-const { writeFileSync, mkdtempSync } = require('node:fs');
+const { writeFileSync, mkdtempSync, mkdirSync, readFileSync, readdirSync } = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { DOMParser } = require('xmldom');
 
 const XSD_DIR = path.join(__dirname, 'xsd');
+const PSA_XSD_DIR = path.join(XSD_DIR, 'psa');
 
 // xmllint liegt auf macOS und den meisten Linux-Distributionen bei. Fehlt es,
 // wird die Suite uebersprungen statt rot zu laufen – aber sichtbar, damit
@@ -1706,35 +1726,160 @@ const XSD_FORMATS = [
   'pain.001.001.09',
   'pain.008.001.02',
   'pain.008.001.08',
+  AT_CT_FORMAT,
+  AT_DD_FORMAT,
 ];
 
-// Lastschrift-Arten, die gegen die eingecheckten XSDs NICHT validiert werden
-// koennen: das sind die vom EPC veroeffentlichten Core-Schemata (Typname
-// ..._SDD_Core_C2PSP), die in LclInstrm/Cd ausschliesslich CORE zulassen. B2B
-// hat ein eigenes Schema, das die Bezugsquelle nicht anbietet – es wird in der
-// Suite "Lastschrift-Art" strukturell geprueft.
-const XSD_UNSUPPORTED_INSTRUMENTS = ['B2B'];
+/**
+ * Prueft, ob eine Lastschrift-Art gegen das XSD des Formats validierbar ist.
+ * Die lhv-Kopien sind die EPC-Core-Schemata (Typname ..._SDD_Core_C2PSP), die
+ * in LclInstrm/Cd ausschliesslich CORE zulassen; B2B wird dort in der Suite
+ * "Lastschrift-Art" strukturell geprueft. Das PSA-Profil deckt CORE UND B2B ab.
+ */
+function xsdSupportsInstrument(painFormat, instr) {
+  return SEPA.isAustrianFormat(painFormat) || instr !== 'B2B';
+}
 
 const xsdTmpDir = mkdtempSync(path.join(os.tmpdir(), 'sepa-xsd-'));
 let xsdFileCounter = 0;
+let psaWorkDir = null;
 
 /**
- * Validiert einen XML-String gegen das XSD seines pain-Formats.
- * Schlaegt mit der vollstaendigen xmllint-Ausgabe fehl, damit die Fehlerzeile
- * direkt lesbar ist statt nur "fails to validate".
+ * Liefert das PSA-Profil als Arbeitskopie OHNE <xs:assert>.
+ *
+ * Die PSA-Schemata sind XSD 1.1; xmllint kennt nur XSD 1.0 und bricht beim
+ * Kompilieren mit "element assert: Schemas parser error" ab. Ohne die Asserts
+ * kompiliert das Profil und prueft weiterhin alle Einschraenkungen aus dem
+ * <xs:redefine> (Struktur, Muster, Codelisten). Die Assert-Regeln selbst
+ * prueft assertPsaRules(). Die Originale in tests/xsd/psa/ bleiben unveraendert.
  */
-function assertSchemaValid(xml, painFormat) {
+function psaSchemaPath(painFormat) {
+  if (!psaWorkDir) {
+    psaWorkDir = path.join(xsdTmpDir, 'psa');
+    mkdirSync(psaWorkDir);
+    for (const file of readdirSync(PSA_XSD_DIR)) {
+      const xsd = readFileSync(path.join(PSA_XSD_DIR, file), 'utf8')
+        .replace(/<xd:assert\b[^>]*?\/>|<xd:assert\b[\s\S]*?<\/xd:assert>/g, '');
+      writeFileSync(path.join(psaWorkDir, file), xsd);
+    }
+  }
+  return path.join(psaWorkDir, `ISO.${painFormat}.xsd`);
+}
+
+/**
+ * Validiert XML per xmllint gegen ein Schema.
+ * @returns {string} '' wenn gueltig, sonst die vollstaendige xmllint-Ausgabe
+ */
+function schemaErrors(xml, painFormat, xsdPath) {
   const xmlPath = path.join(xsdTmpDir, `${painFormat}-${xsdFileCounter++}.xml`);
   writeFileSync(xmlPath, xml);
   try {
-    execFileSync(
-      'xmllint',
-      ['--noout', '--schema', path.join(XSD_DIR, `${painFormat}.xsd`), xmlPath],
-      { stdio: ['ignore', 'pipe', 'pipe'] }
-    );
+    execFileSync('xmllint', ['--noout', '--schema', xsdPath, xmlPath], { stdio: ['ignore', 'pipe', 'pipe'] });
+    return '';
   } catch (e) {
-    const details = (e.stderr ? e.stderr.toString() : '') || e.message;
+    return (e.stderr ? e.stderr.toString() : '') || e.message;
+  }
+}
+
+/**
+ * Validiert einen XML-String gegen das XSD seines pain-Formats – bei den
+ * PSA-Profilen inklusive der Assert-Regeln. Schlaegt mit der vollstaendigen
+ * xmllint-Ausgabe fehl, damit die Fehlerzeile direkt lesbar ist statt nur
+ * "fails to validate".
+ */
+function assertSchemaValid(xml, painFormat) {
+  const at = SEPA.isAustrianFormat(painFormat);
+  const xsdPath = at ? psaSchemaPath(painFormat) : path.join(XSD_DIR, `${painFormat}.xsd`);
+  const details = schemaErrors(xml, painFormat, xsdPath);
+  if (details) {
     assert.fail(`${painFormat} verletzt das Schema:\n${details}`);
+  }
+  if (at) {
+    assertPsaRules(xml, painFormat);
+  }
+}
+
+/**
+ * Prueft die <xs:assert>-Regeln der PSA-Profile, die xmllint nicht auswerten
+ * kann (siehe psaSchemaPath). Bewusst als explizite Liste nah am XSD, damit
+ * beim naechsten PSA-Release ein Abgleich Zeile fuer Zeile moeglich ist.
+ */
+function assertPsaRules(xml, painFormat) {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  const kids = (el, name) => Array.from(el ? el.childNodes : [])
+    .filter(n => n.nodeType === 1 && (!name || n.localName === name));
+  const kid = (el, name) => kids(el, name)[0];
+  const cents = el => Math.round(parseFloat(el.textContent) * 100);
+  const sum = arr => arr.reduce((a, b) => a + b, 0);
+
+  const isDD = SEPA.basePainFormat(painFormat).startsWith('pain.008');
+  const txName = isDD ? 'DrctDbtTxInf' : 'CdtTrfTxInf';
+  const ultimate = isDD ? 'UltmtCdtr' : 'UltmtDbtr';
+  const root = kids(doc.documentElement)[0];
+  const grpHdr = kid(root, 'GrpHdr');
+  const pmtInfs = kids(root, 'PmtInf');
+
+  // CustomerCreditTransferInitiationV09 / CustomerDirectDebitInitiationV08
+  assert.strictEqual(Number(kid(grpHdr, 'NbOfTxs').textContent),
+    sum(pmtInfs.map(p => Number(kid(p, 'NbOfTxs').textContent))), 'PSA: GrpHdr/NbOfTxs = Summe PmtInf/NbOfTxs');
+  assert.strictEqual(cents(kid(grpHdr, 'CtrlSum')),
+    sum(pmtInfs.map(p => cents(kid(p, 'CtrlSum')))), 'PSA: GrpHdr/CtrlSum = Summe PmtInf/CtrlSum');
+  const ids = pmtInfs.map(p => kid(p, 'PmtInfId').textContent);
+  assert.strictEqual(new Set(ids).size, ids.length, 'PSA: PmtInfId eindeutig');
+  assert.ok(pmtInfs.length < 10000, 'PSA: weniger als 10000 PmtInf');
+
+  // PartyIdentification135_InitgPty: genau ein Kind (Nm ODER Id)
+  assert.strictEqual(kids(kid(grpHdr, 'InitgPty')).length, 1, 'PSA: InitgPty hat genau ein Kind');
+
+  for (const p of pmtInfs) {
+    const txs = kids(p, txName);
+    // PaymentInstruction30 / PaymentInstruction29
+    assert.strictEqual(Number(kid(p, 'NbOfTxs').textContent), txs.length, 'PSA: PmtInf/NbOfTxs = Anzahl Transaktionen');
+    const amount = t => cents(isDD ? kid(t, 'InstdAmt') : kid(kid(t, 'Amt'), 'InstdAmt'));
+    assert.strictEqual(cents(kid(p, 'CtrlSum')), sum(txs.map(amount)), 'PSA: PmtInf/CtrlSum = Summe der Betraege');
+    assert.ok(txs.length < 1000000, 'PSA: weniger als 1000000 Transaktionen je PmtInf');
+    if (kid(p, 'PmtTpInf')) {
+      assert.ok(txs.every(t => !kid(t, 'PmtTpInf')), 'PSA: PmtTpInf nicht zugleich auf PmtInf- und Transaktionsebene');
+    } else {
+      assert.ok(txs.every(t => kid(t, 'PmtTpInf')), 'PSA: ohne PmtInf/PmtTpInf braucht jede Transaktion eine');
+    }
+    if (kid(p, ultimate)) {
+      assert.ok(txs.every(t => !kid(t, ultimate)), `PSA: ${ultimate} nicht zugleich auf beiden Ebenen`);
+    }
+    if (kid(p, 'ChrgBr')) {
+      assert.ok(txs.every(t => !kid(t, 'ChrgBr')), 'PSA: ChrgBr nicht zugleich auf beiden Ebenen');
+    }
+    if (isDD) {
+      const txSchemeIds = txs.filter(t => kid(kid(t, 'DrctDbtTx'), 'CdtrSchmeId')).length;
+      assert.strictEqual(txSchemeIds, kid(p, 'CdtrSchmeId') ? 0 : txs.length,
+        'PSA: CdtrSchmeId entweder im PmtInf oder in jeder Transaktion');
+    } else if (kid(kid(p, 'ReqdExctnDt'), 'DtTm')) {
+      const lcl = kid(kid(kid(p, 'PmtTpInf'), 'LclInstrm'), 'Cd');
+      assert.ok(lcl && lcl.textContent === 'INST', 'PSA: ReqdExctnDt/DtTm nur bei LclInstrm INST');
+    }
+
+    for (const t of txs) {
+      const rmtInf = kid(t, 'RmtInf');
+      if (rmtInf) {
+        assert.strictEqual(kids(rmtInf).length, 1, 'PSA: RmtInf hat genau ein Kind (Ustrd ODER Strd)');
+      }
+      if (isDD) {
+        // MandateRelatedInformation14: AmdmntInd=true <=> genau ein AmdmntInfDtls
+        const mndt = kid(kid(t, 'DrctDbtTx'), 'MndtRltdInf');
+        const ind = kid(mndt, 'AmdmntInd');
+        const amended = !!ind && ind.textContent === 'true';
+        assert.strictEqual(kids(mndt, 'AmdmntInfDtls').length, amended ? 1 : 0, 'PSA: AmdmntInd passt zu AmdmntInfDtls');
+      }
+    }
+  }
+
+  // FinancialInstitutionIdentification18_*: genau ein Kind (BICFI ODER Othr);
+  // PaymentTypeInformation*: mindestens ein Kind
+  for (const fin of Array.from(doc.getElementsByTagName('FinInstnId'))) {
+    assert.strictEqual(kids(fin).length, 1, 'PSA: FinInstnId hat genau ein Kind');
+  }
+  for (const pti of Array.from(doc.getElementsByTagName('PmtTpInf'))) {
+    assert.ok(kids(pti).length > 0, 'PSA: PmtTpInf darf nicht leer sein');
   }
 }
 
@@ -1794,7 +1939,7 @@ describe('Schema-Validierung (XSD)', { skip: SKIP_XSD }, () => {
       // Bewusst ueber LOCAL_INSTRUMENTATIONS statt ueber eine feste Liste:
       // wird der Auswahl je ein neuer Code hinzugefuegt, wird er hier
       // automatisch gegen das Schema geprueft.
-      for (const instr of LOCAL_INSTRUMENTATIONS.filter(i => !XSD_UNSUPPORTED_INSTRUMENTS.includes(i))) {
+      for (const instr of LOCAL_INSTRUMENTATIONS.filter(i => xsdSupportsInstrument(fmt, i))) {
         it(`${fmt}: ${instr} validiert in allen Sequenztypen`, () => {
           for (const seq of SEQUENCE_TYPES) {
             const doc = createDirectDebitDoc(fmt, { sequenceType: seq, localInstrumentation: instr });
@@ -1804,15 +1949,95 @@ describe('Schema-Validierung (XSD)', { skip: SKIP_XSD }, () => {
       }
     }
 
+    it(`${fmt}: mit Adresse der Gegenpartei validiert`, () => {
+      // Adresse auf Transaktionsebene: Dbtr bei Lastschrift, Cdtr bei
+      // Ueberweisung. Bei AT strukturiert (StrtNm/TwnNm/Ctry), sonst Ctry +
+      // AdrLine. Frueher las die Library hier immer die debtor*-Felder – bei
+      // Ueberweisungen entstand so eine leere Adresse.
+      const doc = isDD ? createDirectDebitDoc(fmt) : createTransferDoc(fmt);
+      const txn = doc._paymentInfo[0]._payments[0];
+      const party = isDD ? 'debtor' : 'creditor';
+      txn[`${party}Street`] = 'Hauptstrasse 1';
+      txn[`${party}City`] = 'Wien';
+      txn[`${party}Country`] = 'AT';
+      const xml = doc.toString();
+      assert.ok(xml.includes(SEPA.isAustrianFormat(fmt)
+        ? '<PstlAdr><StrtNm>Hauptstrasse 1</StrtNm><TwnNm>Wien</TwnNm><Ctry>AT</Ctry></PstlAdr>'
+        : '<PstlAdr><Ctry>AT</Ctry><AdrLine>Hauptstrasse 1</AdrLine><AdrLine>Wien</AdrLine></PstlAdr>'),
+        'Adresse der Gegenpartei fehlt oder ist falsch aufgebaut');
+      assertSchemaValid(xml, fmt);
+    });
+
+    it(`${fmt}: mit Verwendungszweck-Code (Purp vor RmtInf) validiert`, () => {
+      const doc = isDD ? createDirectDebitDoc(fmt) : createTransferDoc(fmt);
+      doc._paymentInfo[0]._payments[0].purposeCode = isDD ? 'OTHR' : 'SALA';
+      const xml = doc.toString();
+      assert.ok(/<\/(Dbtr|Cdtr)Acct><Purp><Cd>[A-Z]{4}<\/Cd><\/Purp><RmtInf>/.test(xml), 'Purp muss vor RmtInf stehen');
+      assertSchemaValid(xml, fmt);
+    });
+
     it(`${fmt}: Excel-Pipeline mit Umlauten validiert`, () => {
       const rows = isDD
         ? [{ Name: 'Jörg Grün-Weiß', IBAN: 'DE89370400440532013000', BIC: 'COBADEFFXXX', Betrag: 12.34, Verwendungszweck: 'Beitrag für Straßenfest & Grünanlage', Mandatsreferenz: 'MAND-Ä-1', Mandatsdatum: '2025-06-15' }]
         : [{ Name: 'Jörg Grün-Weiß', IBAN: 'DE89370400440532013000', BIC: 'COBADEFFXXX', Betrag: 12.34, Verwendungszweck: 'Rechnung für Straßenfest & Grünanlage', Referenz: 'REF-Ä-1' }];
       const xml = excelToXML(rows, isDD ? 'directDebit' : 'transfer', fmt);
-      assert.ok(!/[^\x00-\x7F]/.test(xml), 'XML darf nach der Umwandlung keine Nicht-ASCII-Zeichen mehr enthalten');
+      if (SEPA.isAustrianFormat(fmt)) {
+        // PSA: Freitexte behalten Umlaute und "&", Referenzen nicht (Max35Text_REF)
+        assert.ok(xml.includes('<Nm>Jörg Grün-Weiß</Nm>'), 'AT: Umlaute im Namen muessen erhalten bleiben');
+        assert.ok(xml.includes('für Straßenfest &amp; Grünanlage'), 'AT: Umlaute und & im Verwendungszweck muessen erhalten bleiben');
+        assert.ok(xml.includes(isDD ? '<MndtId>MAND-Ae-1</MndtId>' : '<EndToEndId>REF-Ae-1</EndToEndId>'),
+          'AT: Referenzen muessen im Basiszeichensatz stehen');
+      } else {
+        assert.ok(!/[^\x00-\x7F]/.test(xml), 'XML darf nach der Umwandlung keine Nicht-ASCII-Zeichen mehr enthalten');
+      }
       assertSchemaValid(xml, fmt);
     });
   }
+
+  // Beweist, dass xmllint das <xs:redefine> der PSA-Profile tatsaechlich
+  // anwendet: dieselbe Datei, die das ISO-Schema akzeptiert, muss am
+  // PSA-Profil scheitern. Ohne diese Gegenprobe koennte ein still ignoriertes
+  // redefine alle AT-Tests gruen faerben.
+  it('PSA-Profil greift: Standard-.09 mit Dbtr-Adresse wird abgelehnt', () => {
+    const doc = createTransferDoc('pain.001.001.09');
+    const info = doc._paymentInfo[0];
+    info.debtorStreet = 'Ring 1';
+    info.debtorCity = 'Wien';
+    info.debtorCountry = 'AT';
+    const xml = doc.toString();
+    assertSchemaValid(xml, 'pain.001.001.09');
+    assert.match(schemaErrors(xml, AT_CT_FORMAT, psaSchemaPath(AT_CT_FORMAT)), /PstlAdr.*not expected/);
+  });
+
+  it('PSA-Profil greift: Standard-.08 mit Cdtr-Adresse wird abgelehnt', () => {
+    const doc = createDirectDebitDoc('pain.008.001.08');
+    const info = doc._paymentInfo[0];
+    info.creditorStreet = 'Ring 1';
+    info.creditorCity = 'Wien';
+    info.creditorCountry = 'AT';
+    const xml = doc.toString();
+    assertSchemaValid(xml, 'pain.008.001.08');
+    assert.match(schemaErrors(xml, AT_DD_FORMAT, psaSchemaPath(AT_DD_FORMAT)), /PstlAdr.*not expected/);
+  });
+
+  it('PSA-Profil greift: CdtrAgt mit NOTPROVIDED wird abgelehnt', () => {
+    const doc = createTransferDoc('pain.001.001.09', {
+      transactions: [{ ...TEST_DATA.accounts[2], bic: '' }],
+    });
+    assert.match(schemaErrors(doc.toString(), AT_CT_FORMAT, psaSchemaPath(AT_CT_FORMAT)), /Othr.*not expected/);
+  });
+
+  // Gegenprobe fuer assertPsaRules: ein manipuliertes Dokument muss scheitern
+  it('PSA-Assert-Regeln erkennen Verstoesse', () => {
+    const xml = createTransferDoc(AT_CT_FORMAT, { transactions: TEST_DATA.accounts }).toString();
+    assert.doesNotThrow(() => assertPsaRules(xml, AT_CT_FORMAT));
+    assert.throws(() => assertPsaRules(xml.replace('<CtrlSum>4500.00</CtrlSum>', '<CtrlSum>4500.01</CtrlSum>'), AT_CT_FORMAT),
+      /CtrlSum/);
+    assert.throws(() => assertPsaRules(xml.replace('</InitgPty>', '<Id/></InitgPty>'), AT_CT_FORMAT),
+      /InitgPty/);
+    assert.throws(() => assertPsaRules(
+      xml.replace('</RmtInf>', '<Strd/></RmtInf>'), AT_CT_FORMAT), /RmtInf/);
+  });
 });
 
 // -------------------------------------------------------------------------
@@ -1837,6 +2062,13 @@ describe('BIC vs. BICFI', () => {
     assert.strictEqual(SEPA.bicTagName('pain.008.001.08'), 'BICFI');
   });
 
+  it('bicTagName liefert BICFI auch fuer die PSA-Profile (Endung ".005"/".004")', () => {
+    // Die AT-Werte enden auf die PSA-Version – ein substr(-2) ergaebe "05"/"04"
+    // und damit faelschlich <BIC>
+    assert.strictEqual(SEPA.bicTagName(AT_CT_FORMAT), 'BICFI');
+    assert.strictEqual(SEPA.bicTagName(AT_DD_FORMAT), 'BICFI');
+  });
+
   for (const fmt of ['pain.008.001.02', 'pain.001.001.03']) {
     it(`${fmt} schreibt <BIC> und niemals <BICFI>`, () => {
       const doc = fmt.startsWith('pain.008') ? createDirectDebitDoc(fmt) : createTransferDoc(fmt);
@@ -1846,7 +2078,7 @@ describe('BIC vs. BICFI', () => {
     });
   }
 
-  for (const fmt of ['pain.008.001.08', 'pain.001.001.08', 'pain.001.001.09']) {
+  for (const fmt of ['pain.008.001.08', 'pain.001.001.08', 'pain.001.001.09', AT_DD_FORMAT, AT_CT_FORMAT]) {
     it(`${fmt} schreibt <BICFI> und niemals <BIC>`, () => {
       const doc = fmt.startsWith('pain.008') ? createDirectDebitDoc(fmt) : createTransferDoc(fmt);
       const xml = doc.toString();
@@ -1878,7 +2110,7 @@ describe('ReqdExctnDt-Struktur', () => {
     assert.ok(xml.includes('<ReqdExctnDt>2026-02-01</ReqdExctnDt>'));
   });
 
-  for (const fmt of ['pain.001.001.08', 'pain.001.001.09']) {
+  for (const fmt of ['pain.001.001.08', 'pain.001.001.09', AT_CT_FORMAT]) {
     it(`${fmt} verschachtelt das Datum in <Dt>`, () => {
       const xml = createTransferDoc(fmt).toString();
       assert.ok(xml.includes('<ReqdExctnDt><Dt>2026-02-01</Dt></ReqdExctnDt>'),
@@ -1959,6 +2191,125 @@ describe('SEPA-Zeichensatz (toSepaText)', () => {
 
   it('ohne Laengenangabe wird nicht gekuerzt', () => {
     assert.strictEqual(SEPA.toSepaText('A'.repeat(200)).length, 200);
+  });
+});
+
+describe('SEPA-Zeichensatz: oesterreichisches PSA-Profil', () => {
+
+  it('behaelt Umlaute, ß und die PSA-Sonderzeichen', () => {
+    assert.strictEqual(SEPA.toSepaText('Müller & Söhne', 70, AT_CT_FORMAT), 'Müller & Söhne');
+    assert.strictEqual(SEPA.toSepaText('ÄÖÜ äöü ß', 70, AT_DD_FORMAT), 'ÄÖÜ äöü ß');
+    const extra = 'Preis 100€ $5 §3 50% a!=b #1 ~x; *{y}[z] @home C:\\pfad_1 20° 2^3 <a> "q" a|b';
+    assert.strictEqual(SEPA.toSepaText(extra, 140, AT_CT_FORMAT), extra);
+  });
+
+  it('wandelt Zeichen ausserhalb des PSA-Zeichensatzes weiterhin um', () => {
+    assert.strictEqual(SEPA.toSepaText('José Ñuñez', 70, AT_CT_FORMAT), 'Jose Nunez');
+    assert.strictEqual(SEPA.toSepaText('„Zitat“ – Ende…', 70, AT_CT_FORMAT), "'Zitat' - Ende...");
+    assert.strictEqual(SEPA.toSepaText('Æsir £5', 70, AT_CT_FORMAT), 'Aesir GBP5');
+  });
+
+  it('erhaelt auch zerlegt eingegebene Umlaute (NFD, z.B. aus macOS)', () => {
+    assert.strictEqual(SEPA.toSepaText('Mu\u0308ller', 70, AT_CT_FORMAT), 'Müller');
+  });
+
+  it('aendert ohne Format bzw. bei Nicht-AT-Formaten nichts am Basisverhalten', () => {
+    assert.strictEqual(SEPA.toSepaText('Müller & Söhne', 70, 'pain.001.001.09'), 'Mueller + Soehne');
+    assert.strictEqual(SEPA.toSepaText('Müller & Söhne'), 'Mueller + Soehne');
+  });
+
+  it('Umlaute im XML bleiben in AT erhalten, in .09 nicht', () => {
+    const rows = [{
+      Name: 'Jörg Grün', IBAN: 'AT483200000012345864', BIC: '',
+      Betrag: 12.34, Verwendungszweck: 'Beitrag für Straßenfest', Referenz: 'REF-1',
+    }];
+    const at = excelToXML(rows, 'transfer', AT_CT_FORMAT);
+    assert.ok(at.includes('<Nm>Jörg Grün</Nm>'));
+    assert.ok(at.includes('<Ustrd>Beitrag für Straßenfest</Ustrd>'));
+    const std = excelToXML(rows, 'transfer', 'pain.001.001.09');
+    assert.ok(std.includes('<Nm>Joerg Gruen</Nm>'));
+  });
+});
+
+describe('SEPA-Referenzen (toSepaId)', () => {
+
+  it('entfernt "/" am Anfang und Ende und reduziert "//" (EPC-Regel fuer Referenzen)', () => {
+    assert.strictEqual(SEPA.toSepaId('/RE-1/'), 'RE-1');
+    assert.strictEqual(SEPA.toSepaId('RE//2026//1'), 'RE/2026/1');
+    assert.strictEqual(SEPA.toSepaId(' / RE 1 / '), 'RE 1');
+  });
+
+  it('bleibt beim Basiszeichensatz – auch fuer AT-Referenzen', () => {
+    assert.strictEqual(SEPA.toSepaId('MAND-Ä-1'), 'MAND-Ae-1');
+    assert.strictEqual(SEPA.toSepaId('A&B'), 'A+B');
+  });
+
+  it('liefert leer, wenn nichts Gueltiges uebrig bleibt (Aufrufer setzt Fallback)', () => {
+    assert.strictEqual(SEPA.toSepaId('///'), '');
+    assert.strictEqual(SEPA.toSepaId(null), '');
+  });
+
+  it('kuerzt ohne "/" am Ende zu hinterlassen', () => {
+    assert.strictEqual(SEPA.toSepaId('A'.repeat(34) + '/B', 35), 'A'.repeat(34));
+  });
+
+  it('ist robust gegen Zahlen aus Excel', () => {
+    assert.strictEqual(SEPA.toSepaId(12345), '12345');
+  });
+
+  it('bereinigte Referenz validiert gegen das PSA-Schema', { skip: SKIP_XSD }, () => {
+    const doc = createTransferDoc(AT_CT_FORMAT, {
+      transactions: [{ ...TEST_DATA.accounts[0], end2endId: sepaId('//RE//Ä-1/', 35) }],
+    });
+    const xml = doc.toString();
+    assert.ok(xml.includes('<EndToEndId>RE/Ae-1</EndToEndId>'));
+    assertSchemaValid(xml, AT_CT_FORMAT);
+  });
+});
+
+describe('PSA-Profile: Formatzuordnung', () => {
+
+  it('basePainFormat liefert das ISO-Basisformat', () => {
+    assert.strictEqual(SEPA.basePainFormat(AT_CT_FORMAT), 'pain.001.001.09');
+    assert.strictEqual(SEPA.basePainFormat(AT_DD_FORMAT), 'pain.008.001.08');
+    assert.strictEqual(SEPA.basePainFormat('pain.001.001.03'), 'pain.001.001.03');
+  });
+
+  it('isAustrianFormat erkennt nur die PSA-Profile', () => {
+    assert.ok(SEPA.isAustrianFormat(AT_CT_FORMAT));
+    assert.ok(SEPA.isAustrianFormat(AT_DD_FORMAT));
+    assert.ok(!SEPA.isAustrianFormat('pain.001.001.09'));
+    assert.ok(!SEPA.isAustrianFormat('pain.001.001.09.austrian.006.N'));
+  });
+
+  it('Namespace und Root-Element kommen vom Basisformat, schemaLocation nennt die PSA-Datei', () => {
+    const ct = createTransferDoc(AT_CT_FORMAT).toString();
+    assert.ok(ct.includes('xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09"'));
+    assert.ok(ct.includes('xsi:schemaLocation="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09 ISO.pain.001.001.09.austrian.005.xsd"'));
+    assert.ok(ct.includes('<CstmrCdtTrfInitn>'));
+    const dd = createDirectDebitDoc(AT_DD_FORMAT).toString();
+    assert.ok(dd.includes('xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08"'));
+    assert.ok(dd.includes('<CstmrDrctDbtInitn>'));
+  });
+
+  it('AT-Ueberweisung laesst die Zahler-Adresse weg, AT-Lastschrift die Glaeubiger-Adresse', () => {
+    const ct = createTransferDoc(AT_CT_FORMAT);
+    Object.assign(ct._paymentInfo[0], { debtorStreet: 'Ring 1', debtorCity: 'Wien', debtorCountry: 'AT' });
+    assert.ok(!ct.toString().includes('<PstlAdr>'));
+    const dd = createDirectDebitDoc(AT_DD_FORMAT);
+    Object.assign(dd._paymentInfo[0], { creditorStreet: 'Ring 1', creditorCity: 'Wien', creditorCountry: 'AT' });
+    assert.ok(!dd.toString().includes('<PstlAdr>'));
+  });
+
+  it('AT-Lastschrift behaelt NOTPROVIDED fuer fehlende BICs (dort erlaubt)', () => {
+    const dd = createDirectDebitDoc(AT_DD_FORMAT, { transactions: [TEST_DATA.accounts[2]] });
+    assert.ok(dd.toString().includes('<DbtrAgt><FinInstnId><Othr><Id>NOTPROVIDED</Id></Othr></FinInstnId></DbtrAgt>'));
+  });
+
+  it('AT prueft die Stadt auf 35 Zeichen (TwnNm)', () => {
+    const doc = createTransferDoc(AT_CT_FORMAT);
+    Object.assign(doc._paymentInfo[0]._payments[0], { creditorStreet: 'Ring 1', creditorCity: 'W'.repeat(36), creditorCountry: 'AT' });
+    assert.throws(() => doc.toString(), /creditorCity/);
   });
 });
 

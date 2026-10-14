@@ -48,7 +48,7 @@
 
     <!-- SEPA-Bibliothek: Erzeugt ISO 20022 XML-Dokumente (pain.001 / pain.008) -->
     <!-- Versionsparameter erzwingt Browser-Reload bei Updates (Cache-Busting). -->
-    <script src="sepa.min.js?v=2026-08-26"></script>
+    <script src="sepa.min.js?v=2026-10-14"></script>
 </head>
 <body>
 
@@ -296,6 +296,7 @@
                          gefiltert, je nach gewaehlter Zahlungsart:
                          - Lastschrift: pain.008.001.02, pain.008.001.08
                          - Ueberweisung: pain.001.001.03, .08, .09
+                         - je ein PSA-Profil fuer Oesterreich (austrian.004 / .005)
                          Die empfohlene Version hat ein ⭐ und "selected".
                     -->
                     <div class="form-section">
@@ -312,15 +313,18 @@
                                 <!-- Lastschrift-Formate (pain.008) -->
                                 <option value="pain.008.001.02" selected>pain.008.001.02 (Bank-kompatibel - EMPFOHLEN) ⭐</option>
                                 <option value="pain.008.001.08">pain.008.001.08 (Neueres ISO-Schema - nicht alle Banken)</option>
+                                <option value="pain.008.001.08.austrian.004">pain.008.001.08 – Österreich (PSA austrian.004)</option>
                                 <!-- Ueberweisungs-Formate (pain.001) -->
                                 <option value="pain.001.001.03" selected>pain.001.001.03 (Bank-kompatibel - EMPFOHLEN) ⭐</option>
                                 <option value="pain.001.001.08">pain.001.001.08 (Neueres ISO-Schema)</option>
                                 <option value="pain.001.001.09">pain.001.001.09 (Neuestes ISO-Schema - nicht alle Banken)</option>
+                                <option value="pain.001.001.09.austrian.005">pain.001.001.09 – Österreich (PSA austrian.005)</option>
                             </select>
                             <div class="help-bubble">
                                 <strong>Welche Version wählen?</strong><br>
                                 • <strong>.02 / .03</strong> (⭐) ist mit deutschen Banken kompatibel und enthält alle Pflichtfelder im PmtInf-Block (NbOfTxs, CtrlSum, BtchBookg).<br>
-                                • <strong>.08 / .09</strong> sind neuere ISO-20022-Schemata; manche Banken (z.B. Hannoversche Volksbank) lehnen sie ab. Nur wählen, wenn Ihre Bank dieses Format ausdrücklich verlangt.
+                                • <strong>.08 / .09</strong> sind neuere ISO-20022-Schemata; manche Banken (z.B. Hannoversche Volksbank) lehnen sie ab. Nur wählen, wenn Ihre Bank dieses Format ausdrücklich verlangt.<br>
+                                • <strong>Österreich (PSA)</strong>: für Konten bei österreichischen Banken. Folgt der Spezifikation der Payment Services Austria – Umlaute in Namen und Verwendungszweck bleiben erhalten, der BIC des Empfängers ist optional.
                             </div>
                         </div>
                     </div>
@@ -903,6 +907,7 @@
                                 <li><strong>pain.001.001.09</strong> - Aktuellste Version für Überweisungen</li>
                             </ul>
                             <p>Ältere Versionen werden für Kompatibilität mit älteren Banking-Systemen unterstützt.</p>
+                            <p><strong>Konto in Österreich?</strong> Wählen Sie die Variante „Österreich (PSA)“. Sie folgt der Spezifikation der Payment Services Austria (pain.001.001.09.austrian.005 bzw. pain.008.001.08.austrian.004), die österreichische Banken bei der Einreichung prüfen.</p>
                             </div>
                         </div>
                     </div>
@@ -1186,6 +1191,7 @@
                     <ul>
                         <li>pain.008.001.02 / .08 (Lastschrift)</li>
                         <li>pain.001.001.03 / .08 / .09 (Überweisung)</li>
+                        <li>PSA austrian.004 / .005 (Österreich)</li>
                     </ul>
                 </div>
 
@@ -1217,6 +1223,6 @@
 
     <!-- Anwendungslogik: Event-Handling, Validierung, XML-Generierung -->
     <!-- Versionsparameter erzwingt Browser-Reload bei Updates (Cache-Busting). -->
-    <script src="sepa-generator.js?v=2026-08-26"></script>
+    <script src="sepa-generator.js?v=2026-10-14"></script>
 </body>
 </html>
