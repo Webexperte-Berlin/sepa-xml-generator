@@ -133,6 +133,34 @@ document.addEventListener('DOMContentLoaded', function() {
     /** Button: Excel-Vorlage herunterladen */
     const downloadTemplateBtn = document.getElementById('downloadTemplate');
 
+    /** Lastschrift-Optionen (Sequenztyp, Verfahren) unter "Weitere Einstellungen" */
+    const directDebitOptions = document.getElementById('directDebitOptions');
+    /** Beschriftung des Datumsfelds (Faelligkeit bzw. Ausfuehrung) */
+    const executionDateLabel = document.getElementById('executionDateLabel');
+    /** Erklaerender Satz unter "Ihr Konto" */
+    const accountIntro = document.getElementById('accountIntro');
+    /** Hinweis fuer oesterreichische Konten + Knopf zum Formatwechsel */
+    const atHint = document.getElementById('atHint');
+    const useAtFormatBtn = document.getElementById('useAtFormat');
+    /** Zusammenfassung "Weitere Einstellungen" im <summary> */
+    const moreSummary = document.getElementById('moreSummary');
+    /** Ablagefeld fuer die Excel-Datei (Drag-&-Drop-Hervorhebung) */
+    const dropzone = document.getElementById('dropzone');
+    /** Container fuer Toast-Meldungen */
+    const toastContainer = document.getElementById('toasts');
+    /** Felder des Blatts "Ihre Datei" */
+    const fileSummary = {
+        name: document.getElementById('fsName'),
+        type: document.getElementById('fsType'),
+        account: document.getElementById('fsAccount'),
+        format: document.getElementById('fsFormat'),
+        dateLabel: document.getElementById('fsDateLabel'),
+        date: document.getElementById('fsDate'),
+        count: document.getElementById('fsCount'),
+        total: document.getElementById('fsTotal'),
+        missing: document.getElementById('fsMissing')
+    };
+
     // ============================================================
     // Anwendungsstatus
     // ============================================================
@@ -147,8 +175,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialisierung: Gespeicherte Konfiguration laden
     // ============================================================
 
+    // Formatliste passend zur Start-Zahlungsart befuellen. Ohne gespeicherte
+    // Konfiguration lief switchPaymentType() beim ersten Besuch nie, und die
+    // statische Liste im HTML blieb stehen.
+    updatePainFormatOptions(currentPaymentType);
+
     // Konfiguration aus dem localStorage wiederherstellen (wenn vorhanden)
     loadConfigFromStorage();
+    updateFileSummary();
 
     // Validierung aller vorausgefuellten Felder nach kurzem Delay
     // (damit die DOM-Elemente vollstaendig aktualisiert sind)
@@ -231,27 +265,6 @@ document.addEventListener('DOMContentLoaded', function() {
     localInstrumentationSelect.addEventListener('change', validateSelect);
 
     // ============================================================
-    // Event-Listener: FAQ-Akkordeon
-    // ============================================================
-
-    document.querySelectorAll('.faq-question').forEach(question => {
-        question.addEventListener('click', function() {
-            const item = this.closest('.faq-item');
-            const wasActive = item.classList.contains('active');
-
-            // Alle anderen FAQ-Eintraege schliessen (nur einer gleichzeitig offen)
-            document.querySelectorAll('.faq-item').forEach(otherItem => {
-                if (otherItem !== item) {
-                    otherItem.classList.remove('active');
-                }
-            });
-
-            // Aktuellen Eintrag togglen
-            item.classList.toggle('active', !wasActive);
-        });
-    });
-
-    // ============================================================
     // Event-Listener: Auto-Save bei Feldaenderungen
     // ============================================================
     // Jede Aenderung an Konfigurationsfeldern wird automatisch
@@ -262,6 +275,38 @@ document.addEventListener('DOMContentLoaded', function() {
      localInstrumentationSelect, debtorNameInput, debtorIBANInput, debtorBICInput].forEach(el => {
         if (el) el.addEventListener('change', saveConfigToStorage);
     });
+
+    // ============================================================
+    // Event-Listener: Blatt "Ihre Datei" live aktualisieren
+    // ============================================================
+
+    [painFormatSelect, executionDateInput, creditorNameInput, creditorIBANInput,
+     creditorIdInput, sequenceTypeSelect, localInstrumentationSelect,
+     debtorNameInput, debtorIBANInput].forEach(el => {
+        el.addEventListener('input', updateFileSummary);
+        el.addEventListener('change', updateFileSummary);
+    });
+
+    // Oesterreichisches Konto erkannt: Formatwechsel mit einem Klick
+    useAtFormatBtn.addEventListener('click', () => {
+        const atFormat = currentPaymentType === 'directDebit'
+            ? 'pain.008.001.08.austrian.004'
+            : 'pain.001.001.09.austrian.005';
+        painFormatSelect.value = atFormat;
+        painFormatSelect.dispatchEvent(new Event('change'));
+    });
+
+    // Ablagefeld hervorheben, solange eine Datei darueber gezogen wird.
+    // Das Ablegen selbst uebernimmt das unsichtbare <input type="file">.
+    ['dragenter', 'dragover'].forEach(type =>
+        dropzone.addEventListener(type, () => dropzone.classList.add('is-dragover')));
+    ['dragleave', 'drop'].forEach(type =>
+        dropzone.addEventListener(type, () => dropzone.classList.remove('is-dragover')));
+
+    // Excel-Bibliothek vorladen, sobald sich jemand dem Excel-Bereich naehert –
+    // so ist sie beim Auswaehlen der Datei meist schon da.
+    ['pointerenter', 'focusin'].forEach(type =>
+        excelInputMethod.addEventListener(type, () => ensureXlsx().catch(() => {}), { once: true }));
 
     // ============================================================
     // Event-Listener: Konfigurationsdatei-Verwaltung
@@ -277,6 +322,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Konfiguration als JSON-Datei herunterladen
     if (saveConfigBtn) {
         saveConfigBtn.addEventListener('click', saveConfigToFile);
+    }
+
+    // Gespeicherte Angaben loeschen: Wer Kontodaten eingibt, soll auch
+    // sehen und steuern koennen, was der Browser davon behaelt.
+    const clearConfigBtn = document.getElementById('clearConfig');
+    if (clearConfigBtn) {
+        clearConfigBtn.addEventListener('click', clearSavedConfig);
     }
 
     // Konfiguration aus JSON-Datei laden
@@ -315,13 +367,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // Geladene Werte auch im localStorage sichern
                     saveConfigToStorage();
+                    updateFileSummary();
 
-                    showSuccess('Konfiguration erfolgreich geladen!');
+                    showSuccess('Einstellungen geladen.');
 
                     // File-Input zuruecksetzen (damit dieselbe Datei erneut geladen werden kann)
                     configFileInput.value = '';
                 } catch (error) {
-                    showError('Fehler beim Laden der Konfigurationsdatei: ' + error.message);
+                    showError('Die Einstellungsdatei konnte nicht gelesen werden: ' + error.message);
                 }
             };
             reader.readAsText(file);
@@ -345,10 +398,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aktiven Button hervorheben
         directDebitBtn.classList.toggle('active', type === 'directDebit');
         transferBtn.classList.toggle('active', type === 'transfer');
+        directDebitBtn.setAttribute('aria-pressed', String(type === 'directDebit'));
+        transferBtn.setAttribute('aria-pressed', String(type === 'transfer'));
 
         // Zahlungsart-spezifische Einstellungen ein-/ausblenden
-        directDebitSettings.style.display = type === 'directDebit' ? 'block' : 'none';
-        transferSettings.style.display = type === 'transfer' ? 'block' : 'none';
+        directDebitSettings.style.display = type === 'directDebit' ? '' : 'none';
+        transferSettings.style.display = type === 'transfer' ? '' : 'none';
+        directDebitOptions.style.display = type === 'directDebit' ? '' : 'none';
+
+        // Texte, die von der Zahlungsart abhaengen
+        executionDateLabel.textContent = type === 'directDebit' ? 'Fälligkeitsdatum' : 'Ausführungsdatum';
+        accountIntro.textContent = type === 'directDebit'
+            ? 'Das Konto, auf das die Lastschriften eingezogen werden.'
+            : 'Das Konto, von dem die Überweisungen abgehen.';
 
         // Info-Boxen (Excel-Spalten-Hinweise) ein-/ausblenden
         if (directDebitInfo) directDebitInfo.style.display = type === 'directDebit' ? 'block' : 'none';
@@ -358,11 +420,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Lastschrift: "Mandatsreferenz *" (Pflichtfeld)
         // Ueberweisung: "Referenz" (optional)
         if (type === 'directDebit') {
-            manualReferenceLabel.textContent = 'Mandatsreferenz *';
-            manualReference.placeholder = 'MAND-001-2025';
+            manualReferenceLabel.textContent = 'Mandatsreferenz';
+            manualReference.placeholder = 'MAND-001';
+            manualReference.setAttribute('required', '');
         } else {
-            manualReferenceLabel.textContent = 'Referenz';
-            manualReference.placeholder = 'Optional';
+            manualReferenceLabel.innerHTML = 'Referenz <span class="optional">optional</span>';
+            manualReference.placeholder = 'z. B. RE-2026-001';
             manualReference.removeAttribute('required');
         }
 
@@ -372,6 +435,63 @@ document.addEventListener('DOMContentLoaded', function() {
         // Transaktionsliste zuruecksetzen (da Formate unterschiedlich sind)
         currentTransactions = [];
         updatePreview();
+    }
+
+    // ============================================================
+    // Blatt "Ihre Datei"
+    // ============================================================
+
+    /**
+     * Aktualisiert die Zusammenfassung rechts neben dem Formular: Dateiname,
+     * Konto, Format, Datum, Anzahl und Summe – und listet auf, was fuer den
+     * Download noch fehlt. Der Knopf bleibt deaktiviert, bis alles da ist;
+     * die Liste "Noch offen" sagt, warum.
+     */
+    function updateFileSummary() {
+        const isDD = currentPaymentType === 'directDebit';
+        const typeName = isDD ? 'Lastschrift' : 'Überweisung';
+        const name = (isDD ? creditorNameInput : debtorNameInput).value.trim();
+        const iban = (isDD ? creditorIBANInput : debtorIBANInput).value.replace(/\s/g, '').toUpperCase();
+        const ibanOk = SEPA.validateIBAN(iban);
+        const today = new Date().toISOString().split('T')[0];
+
+        fileSummary.name.textContent = `${today}_SEPA_${typeName}.xml`;
+        fileSummary.type.textContent = isDD ? 'Lastschrift einziehen' : 'Überweisung senden';
+        fileSummary.account.textContent = name || 'noch nicht angegeben';
+        fileSummary.format.textContent = SEPA.isAustrianFormat(painFormatSelect.value)
+            ? `${SEPA.basePainFormat(painFormatSelect.value)} (AT)`
+            : painFormatSelect.value;
+        fileSummary.dateLabel.textContent = isDD ? 'Fällig am' : 'Ausführung am';
+        fileSummary.date.textContent = executionDateInput.value
+            ? new Date(executionDateInput.value + 'T00:00:00').toLocaleDateString('de-DE')
+            : 'heute';
+
+        const total = currentTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+        fileSummary.count.textContent = String(currentTransactions.length);
+        fileSummary.total.textContent = formatCurrency(total);
+
+        const missing = [];
+        if (!name) missing.push('Name des Kontoinhabers');
+        if (!ibanOk) missing.push(iban ? 'gültige IBAN' : 'IBAN');
+        if (isDD && !SEPA.validateCreditorID(creditorIdInput.value.trim().toUpperCase())) {
+            missing.push(creditorIdInput.value.trim() ? 'gültige Gläubiger-ID' : 'Gläubiger-ID');
+        }
+        if (currentTransactions.length === 0) missing.push('mindestens eine Zahlung');
+
+        fileSummary.missing.innerHTML = missing.length
+            ? `<strong>Noch offen:</strong><ul>${missing.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>`
+            : '';
+        generateBtn.disabled = missing.length > 0;
+
+        // Kurzfassung der weiteren Einstellungen im aufklappbaren Bereich
+        const parts = [fileSummary.format.textContent];
+        if (isDD) {
+            parts.push(sequenceTypeSelect.value, localInstrumentationSelect.value);
+        }
+        moreSummary.textContent = parts.join(', ');
+
+        // Oesterreichisches Konto, aber kein AT-Format gewaehlt: Hinweis zeigen
+        atHint.hidden = !(iban.startsWith('AT') && !SEPA.isAustrianFormat(painFormatSelect.value));
     }
 
     // ============================================================
@@ -388,6 +508,10 @@ document.addEventListener('DOMContentLoaded', function() {
         manualTab.classList.toggle('active', method === 'manual');
         excelInputMethod.classList.toggle('active', method === 'excel');
         manualInputMethod.classList.toggle('active', method === 'manual');
+        excelTab.setAttribute('aria-selected', String(method === 'excel'));
+        manualTab.setAttribute('aria-selected', String(method === 'manual'));
+        excelTab.tabIndex = method === 'excel' ? 0 : -1;
+        manualTab.tabIndex = method === 'manual' ? 0 : -1;
     }
 
     // ============================================================
@@ -419,13 +543,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // die Umstellung der deutschen Kreditwirtschaft laeuft. .02/.03 wird
         // dagegen ueberall akzeptiert und bleibt deshalb die sichere Vorauswahl.
         const options = type === 'directDebit' ? [
-            { value: 'pain.008.001.02', text: 'pain.008.001.02 (Bank-kompatibel - EMPFOHLEN) ⭐', selected: true },
-            { value: 'pain.008.001.08', text: 'pain.008.001.08 (Neueres ISO-Schema - nicht alle Banken)' },
+            { value: 'pain.008.001.02', text: 'pain.008.001.02 – Standard, von deutschen Banken akzeptiert', selected: true },
+            { value: 'pain.008.001.08', text: 'pain.008.001.08 – neueres Schema, nur auf Wunsch der Bank' },
             { value: 'pain.008.001.08.austrian.004', text: 'pain.008.001.08 – Österreich (PSA austrian.004)' }
         ] : [
-            { value: 'pain.001.001.03', text: 'pain.001.001.03 (Bank-kompatibel - EMPFOHLEN) ⭐', selected: true },
-            { value: 'pain.001.001.08', text: 'pain.001.001.08 (Neueres ISO-Schema)' },
-            { value: 'pain.001.001.09', text: 'pain.001.001.09 (Neuestes ISO-Schema - nicht alle Banken)' },
+            { value: 'pain.001.001.03', text: 'pain.001.001.03 – Standard, von deutschen Banken akzeptiert', selected: true },
+            { value: 'pain.001.001.08', text: 'pain.001.001.08 – neueres Schema' },
+            { value: 'pain.001.001.09', text: 'pain.001.001.09 – neuestes Schema, nur auf Wunsch der Bank' },
             { value: 'pain.001.001.09.austrian.005', text: 'pain.001.001.09 – Österreich (PSA austrian.005)' }
         ];
 
@@ -478,7 +602,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Ungültige IBAN (Format: DE89370400440532013000)', 'error');
+            showValidationMessage(input, 'Diese IBAN ist ungültig. Bitte Länge und Prüfziffer kontrollieren.', 'error');
         }
     }
 
@@ -509,7 +633,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Ungültiger BIC (8 oder 11 Zeichen)', 'error');
+            showValidationMessage(input, 'Ein BIC hat 8 oder 11 Zeichen, z. B. COBADEFFXXX.', 'error');
         }
     }
 
@@ -532,11 +656,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isNaN(amount) && amount >= 0.01 && amount <= 999999999.99) {
             input.classList.remove('invalid');
             input.classList.add('valid');
-            showValidationMessage(input, `✓ ${amount.toFixed(2)} EUR`, 'success');
+            removeValidationMessage(input);
         } else {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Betrag muss zwischen 0.01 und 999,999,999.99 EUR liegen', 'error');
+            showValidationMessage(input, 'Bitte einen Betrag zwischen 0,01 € und 999.999.999,99 € angeben.', 'error');
         }
     }
 
@@ -558,11 +682,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (name.length >= 2 && name.length <= 70) {
             input.classList.remove('invalid');
             input.classList.add('valid');
-            showValidationMessage(input, '✓ Gültig', 'success');
+            removeValidationMessage(input);
         } else {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Name muss 2-70 Zeichen lang sein', 'error');
+            showValidationMessage(input, 'Der Name muss 2 bis 70 Zeichen lang sein.', 'error');
         }
     }
 
@@ -584,11 +708,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (text.length >= 1 && text.length <= 140) {
             input.classList.remove('invalid');
             input.classList.add('valid');
-            showValidationMessage(input, `✓ ${text.length}/140 Zeichen`, 'success');
+            showValidationMessage(input, `${text.length} von 140 Zeichen`, 'success');
         } else {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Verwendungszweck darf maximal 140 Zeichen haben', 'error');
+            showValidationMessage(input, 'Der Verwendungszweck darf höchstens 140 Zeichen haben.', 'error');
         }
     }
 
@@ -613,16 +737,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ref.length >= 1 && ref.length <= 35) {
             input.classList.remove('invalid');
             input.classList.add('valid');
-            showValidationMessage(input, '✓ Gültig', 'success');
+            removeValidationMessage(input);
         } else if (ref.length > 35) {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Maximal 35 Zeichen', 'error');
+            showValidationMessage(input, 'Höchstens 35 Zeichen.', 'error');
         } else if (currentPaymentType === 'directDebit') {
             // Bei Lastschrift: Leeres Feld ist ein Fehler
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Pflichtfeld für Lastschriften', 'error');
+            showValidationMessage(input, 'Bei Lastschriften ist die Mandatsreferenz Pflicht.', 'error');
         }
     }
 
@@ -654,7 +778,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Format: DE98ZZZ09999999999', 'error');
+            showValidationMessage(input, 'Diese Gläubiger-ID ist ungültig, Format z. B. DE98ZZZ09999999999.', 'error');
         }
     }
 
@@ -682,11 +806,11 @@ document.addEventListener('DOMContentLoaded', function() {
             input.classList.remove('invalid');
             input.classList.add('valid');
             const daysDiff = Math.ceil((selectedDate - today) / (1000 * 60 * 60 * 24));
-            showValidationMessage(input, `✓ In ${daysDiff} Tag${daysDiff !== 1 ? 'en' : ''}`, 'success');
+            showValidationMessage(input, daysDiff === 0 ? 'Heute' : `In ${daysDiff} Tag${daysDiff !== 1 ? 'en' : ''}`, 'success');
         } else {
             input.classList.remove('valid');
             input.classList.add('invalid');
-            showValidationMessage(input, '✗ Datum muss in der Zukunft liegen', 'error');
+            showValidationMessage(input, 'Das Datum darf nicht in der Vergangenheit liegen.', 'error');
         }
     }
 
@@ -792,13 +916,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function addManualTransaction() {
         // Pflichtfelder pruefen
         if (!manualName.value || !manualIBAN.value || !manualAmount.value || !manualRemittance.value) {
-            showError('Bitte füllen Sie alle Pflichtfelder aus!');
+            showError('Bitte füllen Sie Name, IBAN, Betrag und Verwendungszweck aus.');
             return;
         }
 
         // Bei Lastschrift ist die Mandatsreferenz Pflicht
         if (currentPaymentType === 'directDebit' && !manualReference.value) {
-            showError('Mandatsreferenz ist erforderlich für Lastschriften!');
+            showError('Bitte geben Sie die Mandatsreferenz an – bei Lastschriften ist sie Pflicht.');
             return;
         }
 
@@ -834,8 +958,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Vorschautabelle aktualisieren
         updatePreview();
 
+        hideError();
+        manualName.focus();
+
         // Erfolgs-Feedback anzeigen
-        showSuccess(`✓ Zahlung hinzugefügt! Insgesamt: ${currentTransactions.length}`);
+        showSuccess(`Zahlung hinzugefügt. Die Liste enthält jetzt ${currentTransactions.length} Zahlung${currentTransactions.length === 1 ? '' : 'en'}.`);
     }
 
     // ============================================================
@@ -856,7 +983,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const file = e.target.files[0];
         if (!file) return;
 
-        fileName.textContent = `📄 ${file.name}`;
+        fileName.textContent = `Ausgewählt: ${file.name}`;
         hideError();
 
         try {
@@ -864,10 +991,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // cellDates:true → Excel-Datumsseriennummern werden zu JS Date-Objekten,
             // damit new Date(...) sie korrekt verarbeitet (ohne diese Option würde
             // z.B. 45658 als Millisekunden seit 1970 interpretiert).
+            const xlsx = await ensureXlsx();
             const data = await file.arrayBuffer();
-            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const workbook = xlsx.read(data, { type: 'array', cellDates: true });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(firstSheet);
+            const rows = xlsx.utils.sheet_to_json(firstSheet);
 
             if (rows.length === 0) {
                 throw new Error('Die Excel-Datei enthält keine Daten.');
@@ -953,14 +1081,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 .map((t, i) => (!t.iban || !t.name) ? i + 2 : null)
                 .filter(n => n !== null);
             if (incompleteRows.length > 0) {
-                showError(`⚠️ In Excel-Zeile ${incompleteRows.join(', ')} fehlt Name oder IBAN. Die übrigen Zeilen wurden importiert – bitte fehlende Angaben ergänzen und erneut hochladen (oder die Zeilen in der Vorschau entfernen).`);
+                showError(`In Excel-Zeile ${incompleteRows.join(', ')} fehlt Name oder IBAN. Die übrigen Zeilen wurden importiert. Ergänzen Sie die Angaben und laden Sie die Datei erneut hoch, oder entfernen Sie die Zeilen aus der Liste.`);
             } else {
-                showSuccess(`✓ ${transactions.length} Transaktionen aus der Excel-Datei importiert.`);
+                showSuccess(`${transactions.length} Zahlung${transactions.length === 1 ? '' : 'en'} aus der Excel-Datei übernommen.`);
             }
 
         } catch (error) {
-            showError(`Fehler beim Lesen der Datei: ${error.message}`);
+            showError(`Die Datei konnte nicht gelesen werden: ${error.message}`);
             console.error(error);
+        } finally {
+            // Gleiche Datei erneut waehlbar machen (sonst feuert kein change-Event)
+            fileInput.value = '';
         }
     }
 
@@ -974,35 +1105,38 @@ document.addEventListener('DOMContentLoaded', function() {
      * allen Transaktionen inkl. Loeschen-Button.
      */
     function updatePreview() {
+        updateFileSummary();
+
         // Keine Transaktionen: Vorschau ausblenden
         if (currentTransactions.length === 0) {
             previewSection.style.display = 'none';
             return;
         }
 
-        previewSection.style.display = 'block';
+        previewSection.style.display = '';
 
         // Zusammenfassung berechnen und anzeigen
         const totalAmount = currentTransactions.reduce((sum, t) => sum + t.amount, 0);
         const count = currentTransactions.length;
-        summary.textContent = `📊 Gefunden: ${count} Transaktionen | Gesamtbetrag: ${formatCurrency(totalAmount)}`;
+        summary.textContent = `${count} Zahlung${count === 1 ? '' : 'en'}, zusammen ${formatCurrency(totalAmount)}`;
 
-        // Tabellenzeilen erstellen
+        // Tabellenzeilen erstellen: Name mit IBAN darunter, Verwendungszweck
+        // mit Referenz darunter – so passt die Liste ohne seitliches Scrollen.
+        // Frueher fehlte bei Ueberweisungen die Referenzzelle, und die Spalten
+        // rutschten gegenueber dem Tabellenkopf um eine nach links.
+        const refLabel = currentPaymentType === 'directDebit' ? 'Mandatsreferenz' : 'Referenz';
         previewBody.innerHTML = '';
         currentTransactions.forEach((t, index) => {
             const row = document.createElement('tr');
+            const ref = t.mandateId
+                ? `<span class="cell-sub">${refLabel}: ${escapeHtml(t.mandateId)}</span>`
+                : '';
             row.innerHTML = `
-                <td>${index + 1}</td>
-                <td><strong>${escapeHtml(t.name)}</strong></td>
-                <td><code>${escapeHtml(t.iban)}</code></td>
-                <td class="amount">${formatCurrency(t.amount)}</td>
-                <td>${escapeHtml(t.remittanceInfo)}</td>
-                ${currentPaymentType === 'directDebit' ? `<td>${escapeHtml(t.mandateId)}</td>` : ''}
-                <td>
-                    <button class="btn-remove" onclick="removeTransaction(${index})" title="Entfernen">
-                        🗑️
-                    </button>
-                </td>
+                <td class="num">${index + 1}</td>
+                <td><span class="cell-main">${escapeHtml(t.name)}</span><span class="cell-sub code">${escapeHtml(formatIban(t.iban))}</span></td>
+                <td><span class="cell-main">${escapeHtml(t.remittanceInfo)}</span>${ref}</td>
+                <td class="num">${formatCurrency(t.amount)}</td>
+                <td class="action"><button type="button" class="btn-remove" onclick="removeTransaction(${index})" aria-label="Zahlung ${index + 1} entfernen">Entfernen</button></td>
             `;
             previewBody.appendChild(row);
         });
@@ -1042,13 +1176,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // === Schritt 1: Validierung ===
 
         if (currentTransactions.length === 0) {
-            showError('Bitte fügen Sie zuerst Transaktionen hinzu!');
-            return;
-        }
-
-        // Pflichtfelder pruefen (je nach Zahlungsart)
-        if (!initiatorNameInput.value) {
-            showError('Bitte geben Sie den Initiator-Namen ein!');
+            showError('Bitte fügen Sie zuerst mindestens eine Zahlung hinzu.');
             return;
         }
 
@@ -1061,7 +1189,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isDirectDebit) {
             if (!creditorNameInput.value || !creditorIBANInput.value || !creditorIdInput.value) {
-                showError('Bitte füllen Sie im Abschnitt „Empfänger-Daten (Gläubiger)" Ihren Namen, Ihre IBAN und Ihre Gläubiger-ID aus. Das sind Ihre eigenen Daten im Formular oben – sie kommen nicht aus der Excel-Datei.');
+                showError('Bitte tragen Sie unter „Ihr Konto“ Kontoinhaber, IBAN und Gläubiger-ID ein. Das sind Ihre eigenen Daten – sie kommen nicht aus der Excel-Datei.');
                 return;
             }
             // Mandatsreferenz ist bei Lastschrift Pflicht – ohne Wert wird die XML
@@ -1106,7 +1234,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else {
             if (!debtorNameInput.value || !debtorIBANInput.value) {
-                showError('Bitte füllen Sie im Abschnitt „Auftraggeber-Daten" Ihren Namen und Ihre IBAN aus. Das sind Ihre eigenen Kontodaten (Zahler) im Formular oben – sie kommen nicht aus der Excel-Datei.');
+                showError('Bitte tragen Sie unter „Ihr Konto“ Kontoinhaber und IBAN ein. Das ist das Konto, von dem überwiesen wird – es kommt nicht aus der Excel-Datei.');
                 return;
             }
         }
@@ -1121,7 +1249,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // === Schritt 3: GroupHeader konfigurieren ===
             doc.grpHdr.id = generateMessageId();       // Eindeutige Nachrichten-ID
             doc.grpHdr.created = new Date();            // Erstellungszeitpunkt (muss Date-Objekt sein!)
-            doc.grpHdr.initiatorName = sepaText(initiatorNameInput.value, 70, painFormat);
+            // Ersteller der Datei (InitgPty): optional – ohne eigene Angabe ist
+            // es der Kontoinhaber, so wie in den allermeisten Faellen.
+            const initiator = initiatorNameInput.value.trim()
+                || (isDirectDebit ? creditorNameInput.value : debtorNameInput.value);
+            doc.grpHdr.initiatorName = sepaText(initiator, 70, painFormat);
 
             // === Schritt 4: PaymentInfo erstellen und konfigurieren ===
             const info = doc.createPaymentInfo();
@@ -1231,7 +1363,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            showSuccess('✓ SEPA-XML-Datei erfolgreich erstellt und heruntergeladen!');
+            showSuccess('Die XML-Datei wurde heruntergeladen. Laden Sie sie jetzt in Ihrem Online-Banking hoch.');
 
             // Wenn Text umgeschrieben wurde, den Nutzer darueber informieren –
             // sonst wirkt "Mueller" statt "Müller" in der Datei wie ein Fehler.
@@ -1251,11 +1383,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const why = SEPA.isAustrianFormat(painFormat)
                     ? 'Referenzen erlauben auch in Österreich keine Umlaute.'
                     : 'Das ist gewollt – viele Banken lehnen Umlaute ab.';
-                showSuccess(`ℹ️ ${reason}: ${examples}${more}. ${why}`, 'info');
+                showSuccess(`${reason}: ${examples}${more}. ${why}`, 'info');
             }
 
         } catch (error) {
-            showError(`Fehler beim Generieren der XML: ${error.message}`);
+            showError(`Die Datei konnte nicht erstellt werden: ${error.message}`);
             console.error(error);
         }
     }
@@ -1271,7 +1403,14 @@ document.addEventListener('DOMContentLoaded', function() {
      * Lastschrift-Vorlage: Name, IBAN, BIC, Betrag, Verwendungszweck, Mandatsreferenz, Mandatsdatum
      * Ueberweisungs-Vorlage: Name, IBAN, BIC, Betrag, Verwendungszweck, Referenz
      */
-    function downloadExcelTemplate() {
+    async function downloadExcelTemplate() {
+        let XLSX;
+        try {
+            XLSX = await ensureXlsx();
+        } catch (error) {
+            showError(error.message);
+            return;
+        }
         const wb = XLSX.utils.book_new();
 
         // Beispieldaten je nach Zahlungsart
@@ -1280,13 +1419,13 @@ document.addEventListener('DOMContentLoaded', function() {
             data = [
                 ['Name', 'IBAN', 'BIC', 'Betrag', 'Verwendungszweck', 'Mandatsreferenz', 'Mandatsdatum'],
                 ['Max Mustermann', 'DE89370400440532013000', 'COBADEFFXXX', 45.00, 'Mitgliedsbeitrag Januar 2025', 'MAND-001-2025', '2025-01-01'],
-                ['Erika Musterfrau', 'DE89370400440532013001', '', 30.00, 'Mitgliedsbeitrag Januar 2025', 'MAND-002-2025', '2025-01-01']
+                ['Erika Musterfrau', 'DE02120300000000202051', '', 30.00, 'Mitgliedsbeitrag Januar 2025', 'MAND-002-2025', '2025-01-01']
             ];
         } else {
             data = [
                 ['Name', 'IBAN', 'BIC', 'Betrag', 'Verwendungszweck', 'Referenz'],
                 ['Max Mustermann', 'DE89370400440532013000', 'COBADEFFXXX', 1500.00, 'Gehalt Januar 2025', 'REF-001'],
-                ['Erika Musterfrau', 'DE89370400440532013001', '', 2000.00, 'Gehalt Januar 2025', 'REF-002']
+                ['Erika Musterfrau', 'DE02120300000000202051', '', 2000.00, 'Gehalt Januar 2025', 'REF-002']
             ];
         }
 
@@ -1309,7 +1448,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const type = currentPaymentType === 'directDebit' ? 'Lastschrift' : 'Überweisung';
         XLSX.writeFile(wb, `SEPA_${type}_Vorlage.xlsx`);
 
-        showSuccess('✓ Excel-Vorlage heruntergeladen! Füllen Sie diese aus und laden Sie sie wieder hoch.');
+        showSuccess('Vorlage heruntergeladen. Tragen Sie Ihre Zahlungen ein und laden Sie die Datei hier hoch.');
     }
 
     // ============================================================
@@ -1378,6 +1517,38 @@ document.addEventListener('DOMContentLoaded', function() {
      *
      * Dateiname: sepa-config-YYYY-MM-DD.json
      */
+    /**
+     * Loescht die im localStorage gespeicherten Kontoangaben und Einstellungen
+     * und leert die zugehoerigen Felder. Die Zahlungsliste bleibt unberuehrt.
+     */
+    function clearSavedConfig() {
+        if (!confirm('Gespeicherte Kontoangaben und Einstellungen in diesem Browser löschen?')) {
+            return;
+        }
+
+        try {
+            localStorage.removeItem('sepaConfig');
+        } catch (e) {
+            console.warn('Could not clear localStorage:', e);
+        }
+
+        [initiatorNameInput, executionDateInput, creditorNameInput, creditorIBANInput,
+         creditorBICInput, creditorIdInput, debtorNameInput, debtorIBANInput, debtorBICInput].forEach(field => {
+            field.value = '';
+            field.classList.remove('valid', 'invalid');
+            removeValidationMessage(field);
+        });
+        sequenceTypeSelect.value = 'RCUR';
+        localInstrumentationSelect.value = 'CORE';
+        updatePainFormatOptions(currentPaymentType);
+        [painFormatSelect, sequenceTypeSelect, localInstrumentationSelect].forEach(select => {
+            select.classList.remove('valid', 'invalid');
+        });
+
+        updateFileSummary();
+        showSuccess('Die gespeicherten Angaben wurden aus diesem Browser gelöscht.');
+    }
+
     function saveConfigToFile() {
         const config = {
             paymentType: currentPaymentType,
@@ -1409,7 +1580,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        showSuccess('Konfiguration erfolgreich als Datei gespeichert!');
+        showSuccess('Einstellungen als Datei gespeichert.');
     }
 
     /**
@@ -1475,39 +1646,16 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function showSuccess(message, variant) {
         const isInfo = variant === 'info';
-
-        // Bereits sichtbare Toasts nach unten ausweichen lassen, damit sich
-        // Erfolgs- und Hinweismeldung nicht ueberdecken.
-        const stacked = document.querySelectorAll('[data-toast]').length;
-
-        const successDiv = document.createElement('div');
-        successDiv.setAttribute('data-toast', '');
-        successDiv.style.cssText = `
-            position: fixed;
-            top: ${20 + stacked * 96}px;
-            right: 20px;
-            max-width: min(420px, calc(100vw - 40px));
-            background: ${isInfo
-                ? 'linear-gradient(135deg, #3b82f6, #2563eb)'
-                : 'linear-gradient(135deg, #10b981, #059669)'};
-            color: white;
-            padding: 1.5rem 2rem;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px ${isInfo ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'};
-            z-index: 10000;
-            font-weight: 600;
-            font-size: 1.05rem;
-            line-height: 1.4;
-            animation: slideIn 0.3s ease;
-        `;
-        successDiv.textContent = message;
-        document.body.appendChild(successDiv);
+        const toast = document.createElement('div');
+        toast.className = isInfo ? 'toast toast--info' : 'toast';
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
 
         // Hinweise stehen laenger, weil sie mehr Text zum Lesen enthalten.
         setTimeout(() => {
-            successDiv.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => successDiv.remove(), 300);
-        }, isInfo ? 9000 : 3000);
+            toast.classList.add('is-leaving');
+            setTimeout(() => toast.remove(), 200);
+        }, isInfo ? 9000 : 4000);
     }
 
     // ============================================================
@@ -1666,57 +1814,44 @@ document.addEventListener('DOMContentLoaded', function() {
      * @param {string} text - Zu escapender Text
      * @returns {string} HTML-sicherer Text
      */
+    /**
+     * Gruppiert eine IBAN in Vierergruppen (Anzeige in der Vorschau).
+     * @param {string} iban - IBAN ohne Leerzeichen
+     * @returns {string} z.B. "DE89 3704 0044 0532 0130 00"
+     */
+    function formatIban(iban) {
+        return String(iban || '').replace(/(.{4})(?=.)/g, '$1 ');
+    }
+
+    /**
+     * Laedt die Excel-Bibliothek (SheetJS) erst bei Bedarf. Sie ist mit
+     * rund 880 KB groesser als der ganze Rest der Seite und wird nur fuer
+     * Import und Vorlage gebraucht. Sie liegt lokal unter vendor/, damit kein
+     * Abruf bei einem fremden CDN entsteht.
+     *
+     * @returns {Promise<Object>} Das XLSX-Objekt
+     */
+    let xlsxPromise = null;
+    function ensureXlsx() {
+        if (window.XLSX) return Promise.resolve(window.XLSX);
+        if (!xlsxPromise) {
+            xlsxPromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'vendor/xlsx-0.18.5.full.min.js';
+                script.onload = () => resolve(window.XLSX);
+                script.onerror = () => {
+                    xlsxPromise = null;
+                    reject(new Error('Die Excel-Funktion konnte nicht geladen werden. Bitte prüfen Sie Ihre Internetverbindung und laden Sie die Seite neu.'));
+                };
+                document.head.appendChild(script);
+            });
+        }
+        return xlsxPromise;
+    }
+
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
 });
-
-// ============================================================
-// Dynamische CSS-Animationen fuer Erfolgs-Benachrichtigungen
-// ============================================================
-// Diese Styles werden dynamisch zum <head> hinzugefuegt, da sie
-// nur fuer die JavaScript-generierten Toast-Notifications benoetigt werden.
-
-const style = document.createElement('style');
-style.textContent = `
-    /* Slide-In Animation: Toast-Notification kommt von rechts herein */
-    @keyframes slideIn {
-        from {
-            transform: translateX(400px);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-
-    /* Slide-Out Animation: Toast-Notification gleitet nach rechts heraus */
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(400px);
-            opacity: 0;
-        }
-    }
-
-    /* Loeschen-Button in der Vorschautabelle */
-    .btn-remove {
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 1.2rem;
-        padding: 0.5rem;
-        transition: transform 0.2s ease;
-    }
-
-    .btn-remove:hover {
-        transform: scale(1.2);
-    }
-`;
-document.head.appendChild(style);

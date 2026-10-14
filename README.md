@@ -26,7 +26,8 @@ Kostenloser, datenschutzfreundlicher SEPA-XML Generator fuer Lastschriften (pain
 | Cookies / Tracking | Keine |
 | DSGVO-konform | Ja |
 | Open Source | Ja - vollstaendig einsehbar |
-| Abhaengigkeiten | Nur XLSX.js (Excel-Parsing) |
+| Abhaengigkeiten | Nur SheetJS (Excel-Parsing), lokal eingebunden |
+| Externe Anfragen | Keine – Schriften und Bibliotheken liegen auf dem eigenen Server |
 
 **Alle Bankdaten, IBANs, Namen und Betraege werden ausschliesslich in Ihrem Browser verarbeitet. Es findet keinerlei Kommunikation mit externen Servern statt.**
 
@@ -34,10 +35,15 @@ Kostenloser, datenschutzfreundlicher SEPA-XML Generator fuer Lastschriften (pain
 
 ```
 sepa-xml-generator/
-├── index.html            # Hauptseite mit komplettem UI (HTML-Struktur)
+├── index.html            # Seite: Generator, Anleitung, Formate, FAQ, strukturierte Daten
 ├── sepa-generator.js     # Anwendungslogik (Event-Handling, Validierung, XML-Erzeugung)
 ├── sepa.min.js           # SEPA-Bibliothek (XML-Dokumentstruktur, ISO 20022 Standard)
-├── style.css             # Styling (responsive Design, Animationen)
+├── blz-bic.js            # BLZ->BIC-Tabelle der Bundesbank
+├── style.css             # Gestaltung (responsive, ohne Framework)
+├── fonts/                # Source Sans 3 und Atkinson Hyperlegible Mono (SIL OFL), selbst gehostet
+├── vendor/               # SheetJS 0.18.5, wird erst bei Bedarf nachgeladen
+├── favicon.svg, apple-touch-icon.png, og-image.png
+├── robots.txt, sitemap.xml, llms.txt
 ├── package.json          # Node.js-Konfiguration (nur fuer Tests)
 ├── tests/
 │   ├── sepa.test.js      # Automatisierte Tests (277 Tests)
@@ -221,8 +227,24 @@ die weiterhin verbreiteten Formate `.02`/`.03` ungueltig machen.
 - `XMLSerializer` - XML-zu-String-Serialisierung
 
 ### Externe Bibliotheken
-- [SheetJS (XLSX)](https://sheetjs.com/) v0.18.5 - Excel-Dateien lesen/schreiben (CDN)
-- Keine weiteren Laufzeit-Abhaengigkeiten
+- [SheetJS (XLSX)](https://sheetjs.com/) v0.18.5 - Excel-Dateien lesen/schreiben. Liegt unter
+  `vendor/` und wird erst geladen, wenn jemand den Excel-Bereich nutzt (rund 880 KB, die
+  beim ersten Seitenaufruf nicht anfallen).
+- Schriften (SIL Open Font License, Lizenztexte in `fonts/`):
+  [Source Sans 3](https://github.com/adobe-fonts/source-sans) fuer Text und Ueberschriften,
+  [Atkinson Hyperlegible Mono](https://github.com/googlefonts/atkinson-hyperlegible-next-mono)
+  fuer IBAN, BIC und andere Codes – sie unterscheidet 0/O und 1/l/I eindeutig.
+- Keine weiteren Laufzeit-Abhaengigkeiten. Die Seite stellt keine Anfragen an fremde Server
+  (frueher wurden SheetJS vom CDN und damit die IP-Adresse an Cloudflare uebertragen).
+
+### SEO und Auffindbarkeit in KI-Suchen
+- `index.html` enthaelt strukturierte Daten (JSON-LD: `WebApplication`, `Organization`,
+  `FAQPage`). Die FAQ-Texte im JSON-LD muessen woertlich dem sichtbaren Abschnitt
+  "Haeufige Fragen" entsprechen – bei Aenderungen beide Stellen anpassen.
+- `robots.txt` erlaubt Suchmaschinen und KI-Crawlern (GPTBot, ClaudeBot, PerplexityBot ...)
+  den Zugriff; `sitemap.xml` und `llms.txt` (Kurzbeschreibung fuer Sprachmodelle) liegen im
+  Wurzelverzeichnis. `lastmod` in der Sitemap und `dateModified` im JSON-LD bei inhaltlichen
+  Aenderungen mitziehen.
 
 ## Tests
 

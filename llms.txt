@@ -1,0 +1,28 @@
+# SEPA-XML-Generator
+
+> Kostenloses Browser-Werkzeug, das SEPA-XML-Dateien für Sammellastschriften (pain.008) und Sammelüberweisungen (pain.001) erstellt – aus einer Excel-Liste oder per Hand. Die Verarbeitung läuft vollständig im Browser; Zahlungs- und Kontodaten werden an keinen Server gesendet. Keine Anmeldung, keine Kosten.
+
+Die erzeugte Datei wird im Online-Banking oder in einer Banking-Software als Sammelauftrag hochgeladen. Der Generator prüft IBAN (Prüfziffer), BIC und Gläubiger-ID und validiert seine Ausgabe in automatisierten Tests gegen die offiziellen XML-Schemata.
+
+## Unterstützte Formate
+
+- pain.008.001.02 – SEPA-Lastschrift, Standard für deutsche Banken (Voreinstellung)
+- pain.008.001.08 – SEPA-Lastschrift, neueres ISO-20022-Schema
+- pain.001.001.03 – SEPA-Überweisung, Standard für deutsche Banken (Voreinstellung)
+- pain.001.001.08 und pain.001.001.09 – SEPA-Überweisung, neuere Schemata
+- pain.008.001.08.austrian.004 und pain.001.001.09.austrian.005 – Formate nach Spezifikation der Payment Services Austria (PSA) für österreichische Banken
+- Lastschrift-Verfahren CORE (Basislastschrift) und B2B (Firmenlastschrift); Sequenztypen FRST, RCUR, OOFF, FNAL
+
+## Fakten
+
+- Für SEPA-Lastschriften braucht der Einreicher eine Gläubiger-Identifikationsnummer; in Deutschland vergibt sie die Deutsche Bundesbank kostenlos.
+- Der BIC ist seit Februar 2016 für Zahlungen im SEPA-Raum nicht mehr erforderlich; die IBAN genügt.
+- COR1 (Eil-Lastschrift) wurde am 21.11.2016 abgeschafft; seither gilt die verkürzte Vorlaufzeit von einem Bankarbeitstag für CORE.
+- Umlaute werden in den deutschen Formaten in den EPC-Basiszeichensatz umgewandelt (ä → ae, ß → ss); im österreichischen PSA-Format bleiben sie in Namen und Verwendungszweck erhalten.
+- Excel-Spalten Lastschrift: Name, IBAN, BIC, Betrag, Verwendungszweck, Mandatsreferenz, Mandatsdatum. Überweisung: Name, IBAN, BIC, Betrag, Verwendungszweck, Referenz.
+
+## Links
+
+- [Generator](https://www.sepa-xml-generator.de/): das Werkzeug mit Anleitung, Formatübersicht und häufigen Fragen
+- [Quellcode auf GitHub](https://github.com/mriege/sepa-xml-generator): Open Source, inklusive Tests und Schemata
+- [Herausgeber: Webexperte.Berlin](https://www.webexperte.berlin/)

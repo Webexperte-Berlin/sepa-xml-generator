@@ -1,2253 +1,1447 @@
-/* =============================================================================
-   SEPA-XML Generator - Stylesheet
-   =============================================================================
-   Styling fuer den SEPA-XML Generator (sepa-xml-generator.de).
+/* ==========================================================================
+   SEPA-XML-Generator – Gestaltung
 
-   Aufbau:
-   1. Reset & CSS-Variablen (Design-Tokens)
-   2. Body & Container (Grundlayout)
-   3. Hero-Bereich (Startseite mit Gradient-Hintergrund)
-   4. Trust-Indikatoren (Vertrauens-Karten)
-   5. Header / 3-Schritte-Uebersicht
-   6. Hauptbereich (main) & Schritt-Sektionen
-   7. Zahlungsart-Buttons (Lastschrift / Ueberweisung)
-   8. Tooltips (Hover-Infoblasen)
-   9. Konfigurationsbereich & Formular-Styling
-   10. Eingabemethoden-Tabs (Excel / Manuell)
-   11. Excel-Upload (Drag & Drop, Dateiauswahl)
-   12. Buttons (Primaer, Sekundaer, Template)
-   13. Vorschau-Bereich (Tabelle, Zusammenfassung)
-   14. Fehlermeldungen (Shake-Animation)
-   15. FAQ-Akkordeon
-   16. Datenschutz-Bereich
-   17. Footer
-   18. Responsive Design (Tablet: 768px, Mobil: 480px)
+   Leitidee: Die Seite ist das Werkzeug. Ruhige Flaechen, eine klare
+   Abfolge von drei Schritten, und genau ein hervorgehobenes Element –
+   das Blatt "Ihre Datei", das live zeigt, was heruntergeladen wird.
 
-   Design-Prinzipien:
-   - Gradient-basiertes Design (#667eea → #764ba2)
-   - Glasmorphismus-Effekte (backdrop-filter: blur)
-   - Abgerundete Karten (border-radius: 16-24px)
-   - Sanfte Hover-Animationen (translateY, scale)
-   - Mobile-first responsive Anpassungen
-   ============================================================================= */
+   Farben aus dem SEPA-Umfeld: Euro-Blau fuer Aktionen, Signalgelb nur fuer
+   den Tastaturfokus (mit dunklem Innenring, damit er auf Weiss sichtbar ist).
+   Schriften: Source Sans 3 fuer Text und Ueberschriften (sachlich, normale
+   Ziffern). Atkinson Hyperlegible Mono fuer Codes wie IBAN, BIC und
+   Glaeubiger-ID – sie unterscheidet 0/O und 1/l/I eindeutig. Beide lokal
+   eingebunden, damit keine Anfrage an Google Fonts entsteht.
+   ========================================================================== */
 
+@font-face {
+    font-family: "Source Sans 3";
+    src: url("fonts/source-sans-3-latin.woff2") format("woff2");
+    font-weight: 200 900;
+    font-style: normal;
+    font-display: swap;
+}
 
-/* =============================================================================
-   1. RESET & CSS-VARIABLEN
-   =============================================================================
-   Universeller Box-Sizing-Reset und zentrale Design-Tokens als CSS Custom
-   Properties. Alle Farben, die im gesamten Stylesheet verwendet werden,
-   sind hier definiert fuer einfache Anpassbarkeit.
-   ============================================================================= */
+@font-face {
+    font-family: "Atkinson Hyperlegible Mono";
+    src: url("fonts/atkinson-hyperlegible-mono-latin.woff2") format("woff2");
+    font-weight: 200 800;
+    font-style: normal;
+    font-display: swap;
+}
 
-/* Universeller Reset: Alle Elemente nutzen border-box fuer konsistente Groessenberechnung */
-* {
-    margin: 0;
-    padding: 0;
+:root {
+    --ink: #17202A;
+    --ink-muted: #56616B;
+    --rule: #D5DBE1;
+    --field-border: #8D97A1;
+    --surface: #F3F5F7;
+    --paper: #FFFFFF;
+    --blue: #0B3D91;
+    --blue-hover: #082D6B;
+    --blue-tint: #E8EEF8;
+    --yellow: #FFC20E;
+    --green: #1D7A4C;
+    --green-tint: #E6F3EC;
+    --red: #B42318;
+    --red-tint: #FDECEA;
+
+    --font: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-code: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    --radius: 8px;
+    --wrap: 1160px;
+    --focus: 0 0 0 2px var(--ink), 0 0 0 5px var(--yellow);
+}
+
+/* ---------- Grundlagen ---------- */
+
+*,
+*::before,
+*::after {
     box-sizing: border-box;
 }
 
-/* Design-Tokens: Zentrale Farbdefinitionen fuer das gesamte Projekt */
-:root {
-    --primary-color: #2563eb;     /* Hauptfarbe: Blau (Buttons, Links, Akzente) */
-    --primary-hover: #1d4ed8;     /* Dunkleres Blau fuer Hover-Zustaende */
-    --secondary-color: #667eea;   /* Sekundaerfarbe: Helles Lila (Gradients) */
-    --success-color: #10b981;     /* Erfolg: Gruen (Validierung OK, Datenschutz) */
-    --error-color: #ef4444;       /* Fehler: Rot (Validierungsfehler, Warnungen) */
-    --warning-color: #f59e0b;     /* Warnung: Orange (Hinweise) */
-    --bg-color: #f8fafc;          /* Hintergrund: Sehr helles Grau */
-    --card-bg: #ffffff;           /* Karten-Hintergrund: Weiss */
-    --text-color: #1e293b;        /* Haupttext: Dunkles Blaugrau */
-    --text-secondary: #64748b;    /* Sekundaertext: Mittleres Grau */
-    --border-color: #e2e8f0;      /* Rahmenfarbe: Helles Grau */
+html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
 }
-
-
-/* =============================================================================
-   2. BODY & CONTAINER
-   =============================================================================
-   Grundlayout der Seite. Der Body hat einen Gradient-Hintergrund,
-   der Container begrenzt die Inhaltsbreite auf max. 1200px.
-   ============================================================================= */
 
 body {
-    /* System-Schriftarten-Stack fuer optimale Darstellung auf allen Betriebssystemen */
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    /* Lila Gradient-Hintergrund: Sichtbar hinter den weissen Inhalts-Karten */
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    padding: 0;
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 1.125rem;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3 {
+    margin: 0;
+    line-height: 1.2;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+}
+
+p {
     margin: 0;
 }
 
-/* Zentrierter Container: Begrenzt die Inhaltsbreite auf 1200px */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0;
+a {
+    color: var(--blue);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
 }
 
+a:hover {
+    color: var(--blue-hover);
+    text-decoration-thickness: 2px;
+}
 
-/* =============================================================================
-   3. HERO-BEREICH
-   =============================================================================
-   Grosser Einstiegsbereich ganz oben auf der Seite mit:
-   - Lila Gradient-Hintergrund (identisch mit Body)
-   - Dekoratives SVG-Muster als Overlay (::before Pseudo-Element)
-   - Badge, Titel, Feature-Karten und CTA-Button
-   ============================================================================= */
+:focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+    border-radius: 4px;
+}
 
-.hero-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 4rem 2rem 3rem;
-    color: white;
-    position: relative;
-    overflow: hidden;    /* Verhindert Ueberstand des SVG-Musters */
+.code {
+    font-family: var(--font-code);
+    font-size: 0.94em;
+    letter-spacing: 0.01em;
+}
+
+.wrap {
     width: 100%;
+    max-width: var(--wrap);
+    margin-inline: auto;
+    padding-inline: 24px;
 }
 
-/* Dekoratives Hintergrundmuster: Kleine Plus-Zeichen als SVG-Data-URI */
-.hero-section::before {
-    content: '';
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.skip-link {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    opacity: 0.5;
+    left: 16px;
+    top: -100px;
+    z-index: 100;
+    padding: 10px 16px;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: var(--radius);
 }
 
-/* Hero-Inhalt: Zentriert mit z-index ueber dem Hintergrundmuster */
-.hero-content {
-    position: relative;
-    z-index: 1;
-    max-width: 1200px;
-    margin: 0 auto;
-    text-align: center;
+.skip-link:focus {
+    top: 12px;
 }
 
-/* Datenschutz-Badge: Gruenes Pill-Label oben im Hero
-   Pulsierende Animation (scale 1 → 1.05 → 1) zieht Aufmerksamkeit an */
-.hero-badge {
+/* ---------- Kopfzeile ---------- */
+
+.site-header {
+    border-bottom: 1px solid var(--rule);
+}
+
+.site-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    min-height: 68px;
+}
+
+.wordmark {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    background: rgba(16, 185, 129, 0.9);  /* Halbtransparentes Gruen */
-    color: white;
-    padding: 0.5rem 1.25rem;
-    border-radius: 50px;                   /* Pill-Form */
-    font-size: 0.9rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-/* Hauptueberschrift: Gross und fett */
-.hero-content h1 {
-    font-size: 3rem;
-    margin-bottom: 1.25rem;
-    font-weight: 800;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    line-height: 1.15;
-}
-
-/* Untertitel: Beschreibung unter der Hauptueberschrift */
-.hero-subtitle {
-    font-size: 1.2rem;
-    margin-bottom: 2.5rem;
-    opacity: 0.9;
-    line-height: 1.6;
-    max-width: 650px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* Feature-Grid: 4 Vorteile nebeneinander (responsive: auto-fit) */
-.hero-features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2.5rem;
-}
-
-/* Einzelne Feature-Karte: Glasmorphismus-Effekt (halbtransparent + Blur) */
-.hero-feature {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    padding: 1.5rem;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    transition: all 0.3s ease;
-}
-
-/* Hover: Karte wird heller und schwebt nach oben */
-.hero-feature:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-4px);
-}
-
-/* Feature-Icon: Emoji ueber dem Text */
-.feature-icon {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-}
-
-/* Feature-Text: Titel (strong) und Beschreibung (span) */
-.feature-text strong {
-    display: block;
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
-}
-
-.feature-text span {
-    font-size: 0.9rem;
-    opacity: 0.9;
-}
-
-/* CTA-Bereich: Abstand nach unten zum Trust-Bereich */
-.hero-cta {
-    margin-bottom: 3rem;
-}
-
-/* CTA-Button: Weisser Pill-Button mit starkem Schatten */
-.cta-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
-    background: white;
-    color: var(--primary-color);
-    padding: 1.25rem 3rem;
-    border-radius: 50px;
-    font-size: 1.2rem;
-    font-weight: 700;
+    gap: 10px;
+    color: var(--ink);
+    font-weight: 750;
+    font-size: 1.0625rem;
     text-decoration: none;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
 }
 
-/* CTA Hover: Schwebt hoch mit staerkerem Schatten */
-.cta-button:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+.wordmark:hover {
+    color: var(--ink);
 }
 
-
-/* =============================================================================
-   4. TRUST-INDIKATOREN
-   =============================================================================
-   Drei Vertrauens-Karten in einem weissen Kasten unterhalb des Hero-Bereichs.
-   Zeigen: Keine Datenuebertragung, SEPA-konform, Benutzerfreundlich.
-   ============================================================================= */
-
-.trust-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    margin-top: 4rem;
-    padding: 3rem 2rem;
-    background: rgba(255, 255, 255, 0.95);    /* Fast-weisser Hintergrund */
-    border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-    position: relative;
-    z-index: 1;
-    max-width: 1200px;
-    margin-left: auto;
-    margin-right: auto;
+.wordmark__mark {
+    width: 30px;
+    height: 30px;
+    flex: none;
 }
 
-/* Einzelnes Trust-Item: Icon links, Text rechts (Flexbox) */
-.trust-item {
+.site-nav {
     display: flex;
-    gap: 1rem;
-    align-items: flex-start;
-    color: var(--text-color);
+    gap: 28px;
 }
 
-/* Trust-Icon: Gruenes SVG-Symbol */
-.trust-item svg {
-    color: var(--success-color);
-    flex-shrink: 0;
-    margin-top: 0.25rem;
+.site-nav a {
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-size: 0.97rem;
 }
 
-.trust-item strong {
-    display: block;
-    font-size: 1.1rem;
-    margin-bottom: 0.25rem;
-    color: var(--text-color);
+.site-nav a:hover {
+    color: var(--ink);
+    text-decoration: underline;
 }
 
-.trust-item p {
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin: 0;
-}
-
-
-/* =============================================================================
-   5. HEADER / 3-SCHRITTE-UEBERSICHT
-   =============================================================================
-   Weisse Karte mit der Schritt-fuer-Schritt-Anleitung.
-   Dient als Sprungziel (#start) fuer den CTA-Button.
-   ============================================================================= */
-
-header {
-    text-align: center;
-    margin: 3rem 2rem;
-    padding: 3rem 2rem;
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-header h2 {
-    font-size: 2rem;
-    margin-bottom: 2rem;
-    color: var(--text-color);
-    border: none;
-    padding: 0;
-}
-
-/* Grid fuer die 3 Schritt-Vorschaukarten */
-.steps-overview {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
-/* Einzelne Vorschaukarte: Heller Gradient mit blauem Rand links */
-.step-preview {
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    padding: 2rem;
-    border-radius: 16px;
-    border-left: 5px solid var(--primary-color);
-    transition: all 0.3s ease;
-}
-
-/* Hover: Karte schwebt hoch mit Schatten */
-.step-preview:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-}
-
-/* Schrittnummer: Runder blauer Kreis mit weisser Zahl */
-.step-preview-number {
-    width: 50px;
-    height: 50px;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.75rem;
-    font-weight: bold;
-    margin-bottom: 1rem;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-}
-
-.step-preview h3 {
-    font-size: 1.3rem;
-    margin-bottom: 0.75rem;
-    color: var(--text-color);
-}
-
-.step-preview p {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin: 0;
-}
-
-
-/* =============================================================================
-   6. HAUPTBEREICH & SCHRITT-SEKTIONEN
-   =============================================================================
-   Der <main>-Bereich ist eine grosse weisse Karte, die alle drei Schritte
-   (Zahlungsart, Konfiguration, Transaktionen) enthaelt.
-
-   Jede .step-section hat:
-   - Einen blauen Gradient-Streifen am linken Rand (::before)
-   - Hover-Effekt mit erhoehtem Schatten
-   - Abgerundete Ecken und inneren Schatten
-   ============================================================================= */
-
-/* Weisse Hauptkarte */
-main {
-    background: white;
-    border-radius: 20px;
-    padding: 2.5rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    margin: 2rem;
-    margin-bottom: 3rem;
-}
-
-/* Einzelne Schritt-Sektion: Karte mit leichtem Hintergrund */
-.step-section {
-    margin: 2rem 0;
-    padding: 2.5rem;
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e9ecef;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-/* Blauer Gradient-Streifen am linken Rand (dekorativ) */
-.step-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    border-radius: 16px 0 0 16px;
-}
-
-/* Hover: Leicht staerkerer Schatten */
-.step-section:hover {
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-/* Schritt-Header: Nummer und Titel nebeneinander */
-.step-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-/* Runde Schrittnummer: Blauer Gradient-Kreis */
-.step-number {
+.site-nav__source {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 50px;
-    height: 50px;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
-    border-radius: 50%;
-    font-size: 1.75rem;
-    font-weight: bold;
-    flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    gap: 7px;
+    padding-left: 28px;
+    border-left: 1px solid var(--rule);
 }
 
-.step-header h2 {
-    font-size: 1.75rem;
-    color: var(--text-color);
-    border: none;
-    padding: 0;
-    margin: 0;
-}
+/* ---------- Einstieg ---------- */
 
-/* Beschreibungstext unter dem Schritt-Header */
-.step-description {
-    color: #666;
-    font-size: 1.05rem;
-    line-height: 1.7;
-    margin: 0 0 1.5rem 0;
-}
-
-
-/* =============================================================================
-   7. ZAHLUNGSART-BUTTONS
-   =============================================================================
-   Zwei grosse Karten zur Auswahl von Lastschrift oder Ueberweisung.
-
-   Zustaende:
-   - Normal: Grauer Rand, weisser Hintergrund
-   - Hover: Blauer Rand, schwebt hoch, blauer Schatten
-   - Aktiv (.active): Blauer Hintergrund-Gradient, gruenes Haekchen (::before)
-   ============================================================================= */
-
-.payment-type-buttons {
+.intro {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    margin-top: 1.5rem;
-}
-
-.payment-type-btn {
-    position: relative;
-    padding: 2rem 1.5rem;
-    border: 2px solid #e0e0e0;
-    border-radius: 16px;
-    background: white;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 56px;
     align-items: center;
-    gap: 0.5rem;
-    text-align: center;
+    padding-top: 56px;
+    padding-bottom: 48px;
 }
 
-/* SVG-Icon: Blaue Farbe */
-.payment-type-btn svg {
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
+.intro h1 {
+    max-width: 20ch;
+    font-size: clamp(2.1rem, 1.4rem + 2.6vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
 }
 
-/* Oberer Text: "Geld einziehen" / "Geld ueberweisen" */
-.payment-type-btn > span {
-    font-size: 0.9rem;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-weight: 500;
+.intro__lead {
+    max-width: 60ch;
+    margin-top: 18px;
+    font-size: 1.2rem;
+    color: var(--ink-muted);
 }
 
-/* Haupttext: "SEPA-Lastschrift" / "SEPA-Ueberweisung" */
-.payment-type-btn strong {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-color);
-    margin: 0.25rem 0;
+.intro__facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.97rem;
 }
 
-/* Beschreibungstext: Beispiele fuer Verwendungszwecke */
-.payment-type-btn small {
-    font-size: 0.95rem;
-    color: #666;
-    line-height: 1.5;
+.intro__facts li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-/* Hover: Blauer Rand, schwebt hoch */
-.payment-type-btn:hover {
-    border-color: var(--primary-color);
-    transform: translateY(-6px);
-    box-shadow: 0 12px 28px rgba(0, 123, 255, 0.2);
+.intro__facts li::before {
+    content: "";
+    width: 14px;
+    height: 8px;
+    border-left: 2.5px solid var(--green);
+    border-bottom: 2.5px solid var(--green);
+    transform: translateY(-3px) rotate(-45deg);
 }
 
-/* Aktiver Zustand: Blauer Hintergrund mit leichtem Schatten */
-.payment-type-btn.active {
-    border-color: var(--primary-color);
-    background: rgba(37, 99, 235, 0.04);
-    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.15);
+.icon {
+    width: 1em;
+    height: 1em;
+    flex: none;
 }
 
-/* Gruenes Haekchen oben rechts bei aktivem Button (CSS-generiert) */
-.payment-type-btn.active::before {
-    content: '✓';
+/* Datenfluss im Einstieg: Geraet -> Bank, die Website bleibt aussen vor */
+.flow {
+    margin: 0;
+    padding: 22px 22px 20px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--paper);
+}
+
+.flow__title {
+    margin-bottom: 16px;
+    font-weight: 750;
+    font-size: 1.05rem;
+}
+
+.flow__path {
+    display: grid;
+    gap: 24px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.flow__node,
+.flow__server {
+    position: relative;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+
+/* Verbindungspfeil vom Geraet zur Bank */
+.flow__node:first-child::after {
+    content: "";
     position: absolute;
-    top: 1.25rem;
-    right: 1.25rem;
+    left: 19px;
+    top: 44px;
+    bottom: -20px;
+    border-left: 2px solid var(--blue);
+}
+
+.flow__node + .flow__node::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: -9px;
+    border: 5px solid transparent;
+    border-top: 6px solid var(--blue);
+}
+
+.flow__icon {
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    border-radius: 10px;
+    background: var(--blue-tint);
+    color: var(--blue);
+}
+
+.flow p {
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+
+.flow strong {
+    display: block;
+    color: var(--ink);
+    font-size: 1rem;
+}
+
+.flow__server {
+    margin-top: 20px;
+    padding: 12px;
+    border: 1.5px dashed var(--field-border);
+    border-radius: 10px;
+}
+
+.flow__server .flow__icon {
+    background: var(--surface);
+    color: var(--ink-muted);
+}
+
+/* ---------- Generator ---------- */
+
+.generator {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 48px;
+    align-items: start;
+    padding-top: 8px;
+    padding-bottom: 72px;
+}
+
+/* Graue Flaeche ueber die volle Breite hinter dem Generator */
+.band {
+    background: var(--surface);
+    border-block: 1px solid var(--rule);
+}
+
+.step {
+    padding-block: 36px;
+}
+
+.step + .step {
+    border-top: 1px solid var(--rule);
+}
+
+.step__title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 1.45rem;
+}
+
+.step__num {
+    display: inline-grid;
+    place-items: center;
     width: 32px;
     height: 32px;
-    background: var(--success-color);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 1.1rem;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-
-/* =============================================================================
-   8. TOOLTIPS
-   =============================================================================
-   Kleine blaue Info-Kreise (ⓘ) neben Labels und Ueberschriften.
-   Beim Hover erscheint ein dunkler Tooltip-Kasten mit erklaerenden Text.
-
-   Aufbau:
-   - ::after → Tooltip-Textbox (liest data-tooltip Attribut aus)
-   - ::before → Kleines Dreieck als Pfeil zum Element
-   ============================================================================= */
-
-/* Info-Kreis: Blaues rundes Icon mit "i" */
-.tooltip-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    background: var(--primary-color);
-    color: white;
-    border-radius: 50%;
-    font-size: 0.85rem;
-    font-weight: bold;
-    cursor: help;
-    margin-left: 0.5rem;
-    position: relative;
-    flex-shrink: 0;
-}
-
-/* Tooltip-Textbox: Erscheint beim Hover ueber dem Icon */
-.tooltip-icon:hover::after {
-    content: attr(data-tooltip);   /* Liest den Tooltip-Text aus dem HTML-Attribut */
-    position: absolute;
-    bottom: calc(100% + 12px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.92);
-    color: white;
-    padding: 1rem 1.25rem;
-    border-radius: 10px;
-    white-space: normal;
-    width: 280px;
-    max-width: 90vw;
-    font-size: 0.9rem;
-    font-weight: normal;
-    z-index: 1000;
-    line-height: 1.5;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-/* Tooltip-Pfeil: Dreieck das zum Info-Icon zeigt */
-.tooltip-icon:hover::before {
-    content: '';
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    border: 6px solid transparent;
-    border-top-color: rgba(0, 0, 0, 0.92);
-}
-
-
-/* =============================================================================
-   9. KONFIGURATIONSBEREICH & FORMULAR-STYLING
-   =============================================================================
-   Formulare fuer Bankdaten, SEPA-Format und Einstellungen.
-
-   Struktur:
-   - .config-form → Hauptcontainer
-   - .form-section → Gruppierte Formularabschnitte (weisser Hintergrund)
-   - .form-grid → Responsive Grid (auto-fit, min 280px)
-   - .form-group → Einzelnes Label + Input
-   - .help-bubble → Erklaerungstext unter Inputs
-
-   Validierungszustaende:
-   - .valid → Gruener Rand + Haekchen-Icon
-   - .invalid → Roter Rand + X-Icon
-   ============================================================================= */
-
-/* Konfigurationssektion: Heller Hintergrund */
-.config-section {
-    background: #ffffff;
-}
-
-/* Konfigurationsverwaltung: Leichter Kasten fuer Speichern/Laden */
-.config-management {
-    margin-top: 2rem;
-    padding: 2rem;
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
-/* Info-Bereich innerhalb der Konfigurationsverwaltung: Icon + Text */
-.config-info {
-    display: flex;
-    gap: 2rem;
-    align-items: flex-start;
-    margin-bottom: 2rem;
-}
-
-/* Emoji-Icon (💾) */
-.info-icon {
-    font-size: 2rem;
-    flex-shrink: 0;
-}
-
-.info-content h4 {
-    font-size: 1.15rem;
-    margin-bottom: 0.5rem;
-    color: var(--text-color);
-}
-
-.info-content p {
-    font-size: 0.95rem;
-    line-height: 1.6;
-    color: #475569;
-    margin-bottom: 0.75rem;
-}
-
-/* Aufzaehlungsliste mit gruenen Haekchen */
-.info-list {
-    list-style: none;
-    padding: 0;
-    margin: 0.5rem 0 0;
-}
-
-.info-list li {
-    padding: 0.4rem 0;
-    padding-left: 1.5rem;
-    position: relative;
-    font-size: 0.9rem;
-    line-height: 1.5;
-}
-
-/* Gruenes Haekchen vor jedem Listeneintrag (CSS-generiert) */
-.info-list li::before {
-    content: '✓';
-    position: absolute;
-    left: 0;
-    color: var(--success-color);
-    font-weight: bold;
-    font-size: 1.2rem;
-}
-
-/* Button-Container fuer Speichern/Laden Buttons */
-.config-buttons {
-    justify-content: center;
-}
-
-/* Zweizeiliger Button-Inhalt (Haupttext + Untertext) */
-.btn-content {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-}
-
-.btn-content span {
-    font-size: 1.1rem;
-}
-
-.btn-content small {
-    font-size: 0.85rem;
-    opacity: 0.9;
-    font-weight: 400;
-}
-
-/* ---- Excel-Anleitung (3-Schritte im Upload-Bereich) ---- */
-
-/* Container: Heller Hintergrund fuer Anleitung */
-.excel-instructions {
-    background: #f8fafc;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    border: 1px solid #e2e8f0;
-}
-
-.instruction-header {
-    text-align: center;
-    margin-bottom: 1.5rem;
-}
-
-/* Icon ueber der Anleitung */
-.instruction-icon {
-    font-size: 2rem;
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-.instruction-header h3 {
-    font-size: 1.15rem;
-    color: var(--text-color);
-    margin: 0;
-    font-weight: 600;
-}
-
-/* 3-Spalten-Grid fuer die Anleitungsschritte */
-.instruction-steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
-}
-
-/* Einzelner Anleitungsschritt: Weisse Karte */
-.instruction-step {
-    background: white;
-    border-radius: 10px;
-    padding: 1.25rem 1rem;
-    text-align: center;
-    border: 1px solid #e2e8f0;
-    position: relative;
-    transition: all 0.2s ease;
-}
-
-.instruction-step:hover {
-    border-color: var(--primary-color);
-}
-
-/* Pfeil zwischen Schritten (→), ausser beim letzten */
-.instruction-step:not(:last-child)::after {
-    content: '→';
-    position: absolute;
-    right: -1.5rem;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1.5rem;
-    color: #94a3b8;
-    font-weight: bold;
-    z-index: 1;
-}
-
-/* Runde Schrittnummer im Anleitungsbereich */
-.step-badge {
-    width: 36px;
-    height: 36px;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1rem;
-    font-weight: bold;
-    margin-bottom: 0.75rem;
-}
-
-.step-content strong {
-    display: block;
-    font-size: 1.1rem;
-    margin-bottom: 0.75rem;
-    color: var(--text-color);
-    font-weight: 600;
-}
-
-.step-content p {
-    font-size: 0.95rem;
-    line-height: 1.6;
-    color: #64748b;
-    margin: 0;
-}
-
-/* ---- Formular-Elemente ---- */
-
-.config-form {
-    display: block;
-}
-
-/* Formularabschnitt: Leichte Karte innerhalb der Step-Section */
-.form-section {
-    background: white;
-    padding: 2rem;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-    border: 1px solid #e2e8f0;
-    box-shadow: none;
-    transition: all 0.3s ease;
-}
-
-.form-section:hover {
-    border-color: #cbd5e1;
-}
-
-.form-section h3 {
-    margin: 0 0 1.5rem 0;
-    color: var(--text-color);
-    font-size: 1.3rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* Responsives Grid fuer Formularfelder (min 280px pro Spalte) */
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-}
-
-/* Einzelne Formulargruppe: Label + Input + optional Hilfetext */
-.form-group {
-    display: flex;
-    flex-direction: column;
-}
-
-/* Label mit optionalem Hilfetext */
-.form-group label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    margin-bottom: 0.75rem;
-    color: var(--text-color);
-    font-weight: 600;
+    flex: none;
+    border-radius: 7px;
+    background: var(--blue);
+    color: var(--paper);
     font-size: 1rem;
+    font-weight: 800;
 }
 
-/* Kleiner Hilfetext unter dem Label */
-.help-text {
-    font-size: 0.85rem;
-    font-weight: 400;
-    color: #6c757d;
-    font-style: italic;
+.step__intro {
+    margin-top: 8px;
+    color: var(--ink-muted);
 }
 
-/* Input- und Select-Felder: Einheitliches Styling */
-.form-group input,
-.form-group select {
-    width: 100%;
-    padding: 1rem;
-    border: 2px solid #dee2e6;
+.step > .choice,
+.step > .fields,
+.step > .tabs {
+    margin-top: 22px;
+}
+
+/* Zahlungsart: zwei Optionen, Verhalten wie Radiobuttons */
+.choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.choice__option {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 18px 52px 18px 20px;
+    border: 1px solid var(--field-border);
     border-radius: 10px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    background: white;
-    font-family: inherit;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
-/* Fokus-Zustand: Blauer Rand mit blauem Glow */
-.form-group input:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+.choice__option::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--field-border);
+    border-radius: 50%;
+    background: var(--paper);
 }
 
-/* CSS-Validierung: Roter Rand bei ungueltigem Input (nur wenn bereits Text eingegeben) */
-.form-group input.input-with-validation:invalid:not(:placeholder-shown) {
-    border-color: var(--error-color);
+.choice__option:hover {
+    border-color: var(--blue);
 }
 
-/* CSS-Validierung: Gruener Rand + Haekchen bei gueltigem Input */
-.form-group input.input-with-validation:valid:not(:placeholder-shown) {
-    border-color: var(--success-color);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2310b981' viewBox='0 0 16 16'%3E%3Cpath d='M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
-    padding-right: 3rem;
+.choice__option.active {
+    border: 2px solid var(--blue);
+    padding: 17px 51px 17px 19px;
+    background: var(--blue-tint);
 }
 
-/* Validierungs-Feedback unter dem Input */
-.validation-feedback {
-    margin-top: 0.5rem;
-    font-size: 0.85rem;
-    min-height: 20px;
-    color: var(--error-color);
+.choice__option.active::after {
+    top: 19px;
+    right: 17px;
+    border-color: var(--blue);
+    background: radial-gradient(circle, var(--blue) 0 5px, var(--paper) 5.5px);
 }
 
-/* ---- JS-gesteuerte Validierungszustaende ---- */
-
-/* Gueltig: Gruener Rand mit Haekchen-Icon (per JS .valid Klasse hinzugefuegt) */
-input.valid,
-select.valid {
-    border-color: var(--success-color) !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2310b981' viewBox='0 0 16 16'%3E%3Cpath d='M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
-    padding-right: 3rem;
+.choice__title {
+    font-size: 1.15rem;
+    font-weight: 750;
 }
 
-/* Ungueltig: Roter Rand mit X-Icon (per JS .invalid Klasse hinzugefuegt) */
-input.invalid,
-select.invalid {
-    border-color: var(--error-color) !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23dc3545' viewBox='0 0 16 16'%3E%3Cpath d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
-    padding-right: 3rem;
+.choice__option.active .choice__title {
+    color: var(--blue);
 }
 
-/* Validierungs-Icons bei Select-Feldern: Weiter rechts wegen des nativen Dropdown-Pfeils */
-select.valid,
-select.invalid {
-    background-position: right 3rem center;
-    padding-right: 4rem;
+.choice__text {
+    color: var(--ink-muted);
+    font-size: 0.95rem;
 }
 
-/* Validierungsnachricht unter dem Input (Text mit Icon) */
-.validation-message {
+/* Formularfelder */
+.fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 20px;
+}
+
+.fields + .fields {
+    margin-top: 18px;
+}
+
+.field {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 500;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
 }
 
-.validation-message.success {
-    color: var(--success-color);
-}
-
-.validation-message.error {
-    color: var(--error-color);
-}
-
-/* Hilfe-Blase: Erklaerungstext unter Formularfeldern */
-.help-bubble {
-    margin-top: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: #f8fafc;
-    border-left: 3px solid var(--primary-color);
-    border-radius: 8px;
-    font-size: 0.85rem;
-    line-height: 1.6;
-    color: #64748b;
-}
-
-.help-bubble strong {
-    color: var(--text-color);
-    display: block;
-    margin-bottom: 0.25rem;
-    font-size: 0.9rem;
-}
-
-.help-bubble a {
-    color: var(--primary-color);
-    text-decoration: underline;
-    font-weight: 500;
-}
-
-/* Kleine Hinweistexte unter Inputs */
-.form-group small {
-    display: block;
-    margin-top: 0.5rem;
-    color: #6c757d;
-    font-size: 0.85rem;
-}
-
-/* Volle Breite: Fuer Felder die beide Grid-Spalten nutzen sollen (z.B. Verwendungszweck) */
-.full-width {
+.field--wide {
     grid-column: 1 / -1;
 }
 
-
-/* =============================================================================
-   10. EINGABEMETHODEN-TABS (Excel / Manuell)
-   =============================================================================
-   Tab-Interface zur Umschaltung zwischen Excel-Upload und manueller Eingabe.
-
-   Aufbau:
-   - .input-method-tabs → Container mit den Tab-Buttons
-   - .input-tab → Einzelner Tab-Button (Excel / Manuell)
-   - .input-method-content → Inhalt der jeweiligen Methode
-   - .active Klasse steuert Sichtbarkeit (display: none/block)
-   ============================================================================= */
-
-/* Tab-Container: Horizontal mit Unterstrich */
-.input-method-tabs {
-    display: flex;
-    gap: 1rem;
-    margin-top: 1.5rem;
-    border-bottom: 3px solid #e0e0e0;
+.field label {
+    font-weight: 650;
+    font-size: 0.97rem;
 }
 
-/* Einzelner Tab-Button */
-.input-tab {
-    flex: 1;
-    padding: 1.25rem 1.5rem;
-    background: none;
-    border: none;
-    border-bottom: 4px solid transparent;   /* Unsichtbarer Unterstrich */
-    cursor: pointer;
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: #666;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    transition: all 0.3s ease;
-    border-radius: 8px 8px 0 0;
-}
-
-.input-tab:hover {
-    color: var(--primary-color);
-    background: rgba(37, 99, 235, 0.05);
-}
-
-/* Aktiver Tab: Blauer Unterstrich und leichter blauer Hintergrund */
-.input-tab.active {
-    color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
-    background: rgba(37, 99, 235, 0.1);
-}
-
-/* Tab-Inhalt: Standardmaessig versteckt */
-.input-method-content {
-    display: none;
-    margin-top: 2rem;
-    animation: fadeIn 0.4s ease;   /* Sanftes Einblenden */
-}
-
-/* Aktiver Tab-Inhalt: Sichtbar */
-.input-method-content.active {
-    display: block;
-}
-
-/* Einblend-Animation fuer Tab-Wechsel */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(15px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-
-/* =============================================================================
-   11. MANUELLE EINGABE & EXCEL-UPLOAD
-   =============================================================================
-   Formularbereich fuer manuelle Transaktionseingabe und
-   Drag-&-Drop Upload-Bereich fuer Excel-Dateien.
-   ============================================================================= */
-
-/* Manuelles Eingabeformular: Weisse Karte */
-.manual-entry-form {
-    background: #ffffff;
-    padding: 2rem;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
-.manual-entry-form h3 {
-    margin: 0 0 1.5rem 0;
-    color: var(--text-color);
-    font-size: 1.25rem;
-    font-weight: 600;
-}
-
-/* Upload-Bereich: Container fuer Template-Download und Dateiauswahl */
-.upload-section {
-    margin: 1.5rem 0;
-    padding: 1.5rem 0;
-}
-
-/* Template-Download Bereich: Zentriert ueber dem Upload-Feld */
-.template-download {
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-
-/* Template-Button: Gruener Gradient */
-.btn-template {
-    background: linear-gradient(135deg, var(--success-color), #059669);
-    color: white;
-    padding: 1rem 2rem;
-    border: none;
-    border-radius: 12px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-}
-
-.btn-template svg {
-    width: 28px;
-    height: 28px;
-}
-
-.btn-template span {
-    font-size: 1.1rem;
-}
-
-.btn-template small {
-    font-size: 0.9rem;
-    opacity: 0.9;
+.optional {
+    margin-left: 4px;
+    color: var(--ink-muted);
     font-weight: 400;
+    font-size: 0.9rem;
 }
 
-.btn-template:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 28px rgba(16, 185, 129, 0.4);
-}
-
-/* Datei-Upload Wrapper: Versteckt den nativen File-Input */
-.file-input-wrapper {
-    position: relative;
-    text-align: center;
-}
-
-/* Nativer File-Input: Komplett versteckt, Label uebernimmt die Interaktion */
-input[type="file"] {
-    display: none;
-}
-
-/* Gestylter Upload-Bereich: Gestrichelte Umrandung (Drag-&-Drop Area) */
-.file-label {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    padding: 3rem 2rem;
-    background: white;
-    border: 2px dashed #cbd5e1;
-    border-radius: 16px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+.field input,
+.field select {
     width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-    position: relative;
-    overflow: hidden;
+    min-height: 48px;
+    padding: 10px 14px;
+    border: 1px solid var(--field-border);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
 }
 
-/* Gradient-Overlay beim Hover (halbtransparent) */
-.file-label::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.03), rgba(102, 126, 234, 0.03));
-    opacity: 0;
-    transition: opacity 0.4s ease;
+.field select {
+    appearance: none;
+    padding-right: 42px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%2317202A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+    text-overflow: ellipsis;
 }
 
-.file-label:hover::before {
+.field input.code {
+    font-family: var(--font-code);
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+}
+
+.field input::placeholder {
+    color: #7B858F;
     opacity: 1;
 }
 
-/* Hover: Blauer Rand, leicht angehoben */
-.file-label:hover {
-    border-color: var(--primary-color);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+.field input:hover,
+.field select:hover {
+    border-color: var(--ink);
 }
 
-/* Upload-Icon: Blaues SVG */
-.file-label svg {
-    width: 48px;
-    height: 48px;
-    color: var(--primary-color);
-    position: relative;
-    z-index: 1;
-    transition: transform 0.3s ease;
+.field input:focus-visible,
+.field select:focus-visible {
+    border-color: var(--ink);
+    border-radius: 6px;
 }
 
-/* Icon-Animation beim Hover: Groesser und nach oben */
-.file-label:hover svg {
-    transform: scale(1.1) translateY(-4px);
+/* Rueckmeldung der Feldpruefung (Klassen setzt sepa-generator.js) */
+.field input.invalid {
+    border-color: var(--red);
+    background: var(--red-tint);
 }
 
-/* Upload-Text: Haupttext */
-.file-label span {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-color);
-    position: relative;
-    z-index: 1;
+.field input.valid {
+    border-color: var(--green);
 }
 
-/* Upload-Text: Untertext */
-.file-label small {
+.validation-message {
     font-size: 0.9rem;
-    color: #64748b;
-    position: relative;
-    z-index: 1;
-}
-
-/* Dateiname-Anzeige: Wird nach erfolgreichem Upload per JS befuellt */
-.file-name {
-    margin-top: 1.5rem;
-    padding: 1.25rem 2rem;
-    background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
-    border-left: 4px solid var(--success-color);
-    border-radius: 12px;
-    font-size: 1.05rem;
-    color: var(--text-color);
     font-weight: 600;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    text-align: center;
 }
 
-/* Leere Dateiname-Anzeige verstecken */
-.file-name:empty {
+.validation-message.error {
+    color: var(--red);
+}
+
+.validation-message.success {
+    color: var(--green);
+}
+
+.field__hint {
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+}
+
+/* Hinweis fuer oesterreichische Konten */
+.notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    margin-top: 20px;
+    padding: 14px 18px;
+    border-left: 4px solid var(--blue);
+    background: var(--blue-tint);
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.notice[hidden] {
     display: none;
 }
 
-
-/* =============================================================================
-   12. BUTTONS
-   =============================================================================
-   Allgemeine Button-Styles und Varianten:
-   - .btn → Basis-Styling (Schatten, Rundung, Hover-Animation)
-   - .btn-primary → Blauer Gradient (Hauptaktionen)
-   - .btn-secondary → Grauer Gradient (Sekundaeraktionen)
-   - .button-group → Zentrierte Button-Gruppe
-
-   Spezialeffekt: Leuchtender Schimmer-Effekt beim Hover (::before Pseudo-Element)
-   ============================================================================= */
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 1.25rem 2.5rem;
-    border: none;
-    border-radius: 12px;
-    font-size: 1.1rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    font-family: inherit;
+.notice p {
+    flex: 1 1 280px;
 }
 
-/* Hover: Leicht angehobener Button mit staerkerem Schatten */
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+/* Weitere Einstellungen */
+.more {
+    margin-top: 24px;
+    border-top: 1px solid var(--rule);
 }
 
-/* Active/Klick: Leicht weniger angehoben */
-.btn:active {
-    transform: translateY(-2px);
-}
-
-/* Primaer-Button: Blauer Gradient */
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
-}
-
-.btn-primary:hover {
-    background: linear-gradient(135deg, var(--primary-hover), #5568d3);
-}
-
-/* Sekundaer-Button: Grauer Gradient */
-.btn-secondary {
-    background: linear-gradient(135deg, #64748b, #475569);
-    color: white;
-}
-
-.btn-secondary:hover {
-    background: linear-gradient(135deg, #475569, #334155);
-}
-
-/* Button-Gruppe: Zentrierte Anordnung mit Umbruch */
-.button-group {
+.more > summary {
     display: flex;
-    gap: 1.5rem;
-    justify-content: center;
     flex-wrap: wrap;
-    margin-top: 2rem;
+    align-items: baseline;
+    gap: 4px 12px;
+    padding: 16px 0 4px;
+    font-weight: 650;
+    color: var(--blue);
+    cursor: pointer;
+    list-style: none;
 }
 
-
-/* =============================================================================
-   13. VORSCHAU-BEREICH
-   =============================================================================
-   Zeigt die importierten/manuell eingegebenen Transaktionen in einer Tabelle.
-
-   Aufbau:
-   - .preview-section → Container (Fade-In Animation)
-   - .summary → Zusammenfassungskasten (Anzahl, Gesamtbetrag)
-   - .table-wrapper → Scrollbarer Tabellencontainer
-   - <table> → Vorschautabelle mit Gradient-Header
-   ============================================================================= */
-
-.preview-section {
-    animation: fadeIn 0.5s ease;
-    margin-top: 2rem;
-    padding: 2rem;
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e9ecef;
+.more > summary::-webkit-details-marker {
+    display: none;
 }
 
-/* Ueberschrift der Vorschau */
-.preview-section h2 {
-    font-size: 1.5rem;
-    margin-bottom: 1.5rem;
-    color: var(--text-color);
-    border-bottom: none;
-    padding-bottom: 0;
+.more > summary::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-2px) rotate(-45deg);
+    transition: transform 0.15s ease;
 }
 
-/* Zusammenfassung: Leichter Kasten mit Transaktionsanzahl und Gesamtbetrag */
-.summary {
-    background: #f8fafc;
-    border-left: 4px solid var(--primary-color);
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1.5rem;
+.more[open] > summary::before {
+    transform: translateY(-4px) rotate(45deg);
+}
+
+.more__current {
+    color: var(--ink-muted);
+    font-weight: 400;
+    font-size: 0.92rem;
+}
+
+.more__body {
+    padding-top: 16px;
+}
+
+.config-actions {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px dashed var(--rule);
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+}
+
+.config-actions__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-top: 8px;
+}
+
+/* Reiter: Excel oder einzeln */
+.tabs {
+    display: flex;
+    gap: 28px;
+    border-bottom: 1px solid var(--rule);
+}
+
+.tabs__tab {
+    margin-bottom: -1px;
+    padding: 10px 0 12px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--ink-muted);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.tabs__tab:hover {
+    color: var(--ink);
+}
+
+.tabs__tab.active {
+    color: var(--ink);
+    border-bottom-color: var(--blue);
+}
+
+.tabs__panel {
+    display: none;
+    padding-top: 22px;
+}
+
+.tabs__panel.active {
+    display: block;
+}
+
+.tabs__panel > .btn {
+    margin-top: 20px;
+}
+
+/* Ablagefeld fuer die Excel-Datei. Das echte <input type="file"> liegt
+   unsichtbar darueber: so funktionieren Klick, Tastatur und Drag & Drop
+   ohne eigenes Script. */
+.dropzone {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 36px 24px;
+    border: 2px dashed var(--field-border);
     border-radius: 10px;
-    font-size: 1.05rem;
-    color: var(--text-color);
+    background: var(--paper);
+    text-align: center;
+}
+
+.dropzone:hover,
+.dropzone.is-dragover {
+    border-color: var(--blue);
+    background: var(--blue-tint);
+}
+
+.dropzone:focus-within {
+    border-style: solid;
+    border-color: var(--ink);
+    box-shadow: 0 0 0 3px var(--yellow);
+}
+
+.dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.dropzone__icon {
+    width: 32px;
+    height: 32px;
+    color: var(--blue);
+}
+
+.dropzone__title {
+    font-weight: 650;
+}
+
+.dropzone__link {
+    color: var(--blue);
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+}
+
+.dropzone__text {
+    color: var(--ink-muted);
+    font-size: 0.92rem;
+}
+
+.file-chosen:not(:empty) {
+    margin-top: 10px;
     font-weight: 600;
 }
 
-/* Scrollbarer Tabellencontainer (fuer schmale Bildschirme) */
-.table-wrapper {
+.columns-hint {
+    margin-top: 18px;
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+}
+
+.columns-hint strong {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.columns-hint .btn {
+    margin-top: 8px;
+}
+
+/* Fehlermeldung */
+.alert {
+    margin-top: 22px;
+    padding: 14px 18px;
+    border-left: 4px solid var(--red);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    background: var(--red-tint);
+    font-weight: 500;
+}
+
+/* Liste der Zahlungen */
+.payments {
+    margin-top: 28px;
+}
+
+.payments__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+    margin-bottom: 12px;
+}
+
+.payments__head h3 {
+    font-size: 1.15rem;
+}
+
+.payments__summary {
+    color: var(--ink-muted);
+}
+
+.payments > .btn {
+    margin-top: 12px;
+}
+
+.table-scroll {
     overflow-x: auto;
-    margin-bottom: 1.5rem;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
-    background: white;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--paper);
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 1rem;
+    font-size: 0.95rem;
 }
 
-/* Tabellenkopf: Lila Gradient */
-thead {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+th,
+td {
+    padding: 11px 14px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--rule);
 }
 
 th {
-    padding: 1.5rem 1.25rem;
-    text-align: left;
-    font-weight: 700;
-    color: white;
-    border-bottom: none;
-    text-transform: uppercase;
-    font-size: 0.9rem;
-    letter-spacing: 1px;
-}
-
-td {
-    padding: 1.25rem;
-    border-bottom: 1px solid #e2e8f0;
-    vertical-align: middle;
-}
-
-/* Tabellenzeilen: Hover-Effekt mit leichtem Zoom */
-tbody tr {
-    transition: all 0.2s ease;
-}
-
-tbody tr:hover {
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-}
-
-/* Letzte Zeile: Kein unterer Rand */
-tbody tr:last-child td {
-    border-bottom: none;
-}
-
-/* Betrags-Zelle: Gruener, fetter Text */
-.amount {
-    font-weight: 800;
-    color: var(--success-color);
-    font-size: 1.15rem;
+    background: var(--surface);
+    color: var(--ink-muted);
+    font-weight: 650;
+    font-size: 0.88rem;
     white-space: nowrap;
 }
 
-/* Code-Snippets (z.B. IBAN-Darstellung) */
-code {
-    background: #f1f5f9;
-    padding: 0.25rem 0.5rem;
-    border-radius: 6px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.9rem;
-    color: var(--primary-color);
+tbody tr:last-child td {
+    border-bottom: 0;
 }
 
-
-/* =============================================================================
-   13b. HINWEISE ZUR EXCEL-DATEI (.info-section)
-   =============================================================================
-   Informationsbereich unterhalb der Vorschau mit den erwarteten
-   Spaltenformaten fuer Lastschrift und Ueberweisung.
-   ============================================================================= */
-
-.info-section {
-    margin-top: 2rem;
-    padding: 1.5rem 2rem;
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
+td.num,
+th.num {
+    text-align: right;
+    white-space: nowrap;
 }
 
-.info-section h3 {
-    font-size: 1.3rem;
-    margin-bottom: 1.5rem;
-    color: var(--text-color);
+.cell-main,
+.cell-sub {
+    display: block;
 }
 
-.info-section h4 {
-    font-size: 1.1rem;
-    margin: 1.5rem 0 0.75rem;
-    color: var(--text-color);
+.cell-sub {
+    margin-top: 2px;
+    color: var(--ink-muted);
+    font-size: 0.88rem;
 }
 
-.info-section ul {
-    margin: 0.5rem 0 1rem 1.5rem;
-    padding: 0;
+.cell-sub.code {
+    font-size: 0.84rem;
+    white-space: nowrap;
 }
 
-.info-section li {
-    margin-bottom: 0.4rem;
-    line-height: 1.6;
-    color: #475569;
+td.action {
+    width: 1%;
+    white-space: nowrap;
 }
 
-.info-section p {
-    margin: 1rem 0 0.5rem;
-    color: #475569;
-    line-height: 1.6;
-}
-
-
-/* =============================================================================
-   14. FEHLERMELDUNGEN
-   =============================================================================
-   Rote Fehlerbox die bei Validierungs- oder Generierungsfehlern erscheint.
-   Enthaelt eine Schuettel-Animation (shake) um Aufmerksamkeit zu erregen.
-   ============================================================================= */
-
-/* Container: Shake-Animation beim Erscheinen */
-.error-section {
-    animation: shake 0.5s ease;
-}
-
-/* Schuettel-Animation: Links-Rechts-Bewegung */
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
-}
-
-/* Fehlermeldung: Rote Box mit rotem Rand links */
-.error-message {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    background: #fef2f2;                    /* Sehr helles Rot */
-    border-left: 5px solid var(--error-color);
-    padding: 1.5rem;
-    border-radius: 12px;
-    color: #991b1b;                         /* Dunkles Rot */
-    font-weight: 500;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
-}
-
-/* Fehler-Icon: Rotes Ausrufezeichen */
-.error-message svg {
-    flex-shrink: 0;
-    color: var(--error-color);
-}
-
-
-/* =============================================================================
-   15. FAQ-AKKORDEON
-   =============================================================================
-   Aufklappbare Fragen-und-Antworten Sektion.
-
-   Funktionsweise:
-   - Klick auf .faq-question togglet .active auf .faq-item (per JS)
-   - .faq-answer hat max-height: 0 (geschlossen) oder 1000px (offen)
-   - CSS-Transition sorgt fuer sanftes Auf-/Zuklappen
-   - Plus-Symbol (+) rotiert zu X bei .active (transform: rotate(45deg))
-   ============================================================================= */
-
-.faq-section {
-    margin-top: 2.5rem;
-    padding: 2.5rem;
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e9ecef;
-}
-
-/* Ueberschrift */
-.faq-section h2 {
-    font-size: 1.75rem;
-    margin-bottom: 2rem;
-    color: var(--text-color);
-    border-bottom: none;
-    padding-bottom: 0;
-    text-align: center;
-}
-
-/* Einzelnes FAQ-Item: Weisse Karte mit Rand */
-.faq-item {
-    background: white;
-    border-radius: 12px;
-    margin-bottom: 1rem;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
-    transition: all 0.2s ease;
-}
-
-.faq-item:hover {
-    border-color: #cbd5e1;
-}
-
-/* Aktives FAQ-Item: Blauer Rand mit Schatten */
-.faq-item.active {
-    border-color: var(--primary-color);
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
-}
-
-/* Frage-Button: Klickbarer Bereich mit Flexbox (Frage links, Toggle rechts) */
-.faq-question {
-    width: 100%;
-    padding: 1.5rem 1.75rem;
+.btn-remove {
+    padding: 2px 0;
+    border: 0;
     background: none;
-    border: none;
-    text-align: left;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-color);
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.88rem;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
     cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1.5rem;
-    transition: color 0.2s ease;
 }
 
-.faq-question h4 {
-    margin: 0;
-    font-size: 1.05rem;
-    line-height: 1.5;
-    font-weight: 600;
+.btn-remove:hover {
+    color: var(--red);
 }
 
-/* Aktive Frage: Blaue Schrift mit leichtem Hintergrund */
-.faq-item.active .faq-question {
-    color: var(--primary-color);
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.03), rgba(99, 102, 241, 0.03));
-}
+/* ---------- Schaltflaechen ---------- */
 
-.faq-question:hover h4 {
-    color: var(--primary-color);
-}
-
-/* Toggle-Symbol: Plus (+) das zu X rotiert */
-.faq-toggle {
-    font-size: 1.5rem;
-    font-weight: 400;
-    color: #94a3b8;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    display: flex;
+.btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: #f1f5f9;
-    border-radius: 6px;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 18px;
+    border: 1.5px solid var(--blue);
+    border-radius: var(--radius);
+    background: var(--paper);
+    color: var(--blue);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
 }
 
-/* Aktives Toggle: 45° Rotation (+ wird zu ×), blauer Hintergrund */
-.faq-item.active .faq-toggle {
-    transform: rotate(45deg);
-    background: var(--primary-color);
-    color: white;
+.btn:hover {
+    background: var(--blue-tint);
 }
 
-/* Antwort-Container: Geschlossen (max-height: 0) mit sanfter Transition */
-.faq-answer {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out;
-    background: #fafafa;
-}
-
-/* Aktive Antwort: Offen (max-height: 1000px) */
-.faq-item.active .faq-answer {
-    max-height: 1000px;
-    transition: max-height 0.4s ease-in;
-}
-
-/* Antwort-Inhalt: Padding und Textformatierung */
-.faq-answer-content {
-    padding: 1.5rem 1.75rem 2rem;
-    color: #475569;
-    line-height: 1.7;
-    font-size: 1rem;
-}
-
-.faq-answer-content strong {
-    color: var(--text-color);
-    display: block;
-    margin: 1.25rem 0 0.5rem;
-    font-size: 1.05rem;
-    font-weight: 600;
-}
-
-.faq-answer-content p {
-    margin: 0 0 1rem;
-}
-
-.faq-answer-content p:last-child {
-    margin-bottom: 0;
-}
-
-.faq-answer-content ul {
-    margin: 0.75rem 0 1rem 1.25rem;
-    padding: 0;
-}
-
-.faq-answer-content li {
-    margin-bottom: 0.5rem;
-    line-height: 1.6;
-}
-
-.faq-answer-content li:last-child {
-    margin-bottom: 0;
-}
-
-.faq-answer-content a {
-    color: var(--primary-color);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.faq-answer-content a:hover {
-    text-decoration: underline;
-}
-
-.faq-answer-content code {
-    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-    padding: 0.35rem 0.75rem;
-    border-radius: 6px;
-    font-family: 'Courier New', monospace;
+.btn--small {
+    min-height: 38px;
+    padding: 6px 14px;
     font-size: 0.95rem;
-    color: var(--primary-color);
-    font-weight: 600;
 }
 
-
-/* =============================================================================
-   16. DATENSCHUTZ-BEREICH
-   =============================================================================
-   Grosser gruener Abschnitt am Ende der Seite mit Datenschutz-Informationen.
-
-   Design:
-   - Gruener Gradient-Hintergrund (#10b981 → #059669)
-   - Weisser Text
-   - Glasmorphismus-Karten (backdrop-filter: blur)
-   - 2x2 Grid mit den 4 Datenschutz-Features
-   - Versprechen-Box am Ende
-   ============================================================================= */
-
-.privacy-section {
-    margin: 3rem 2rem;
-    padding: 3rem 2.5rem;
-    background: linear-gradient(135deg, #10b981, #059669);
-    border-radius: 20px;
-    color: white;
-    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.2);
+.btn--quiet {
+    min-height: 0;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
 }
 
-.privacy-content {
-    max-width: 1000px;
-    margin: 0 auto;
-    text-align: center;
+.btn--quiet:hover {
+    background: none;
+    color: var(--blue-hover);
+    text-decoration-thickness: 2px;
 }
 
-/* Schloss-Emoji */
-.privacy-icon {
-    font-size: 3rem;
-    margin-bottom: 0.75rem;
+.btn--danger {
+    color: var(--red);
 }
 
-.privacy-section h2 {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
-    border: none;
-    padding: 0;
-    color: white;
+.btn--danger:hover {
+    color: #8A1A12;
 }
 
-.privacy-lead {
-    font-size: 1.15rem;
-    margin-bottom: 2.5rem;
-    opacity: 0.9;
-}
-
-/* 2x2 Grid fuer die Datenschutz-Feature-Karten */
-.privacy-features {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 2rem;
-    margin-bottom: 3rem;
-    text-align: left;
-}
-
-/* Responsive: 1 Spalte auf kleinen Bildschirmen */
-@media (max-width: 768px) {
-    .privacy-features {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Einzelne Datenschutz-Karte: Glasmorphismus-Effekt */
-.privacy-item {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    padding: 2rem;
-    border-radius: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    transition: all 0.3s ease;
-}
-
-/* Hover: Heller und schwebt hoch */
-.privacy-item:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: translateY(-4px);
-}
-
-.privacy-item svg {
-    color: white;
-    margin-bottom: 1rem;
-}
-
-.privacy-item h3 {
-    font-size: 1.3rem;
-    margin-bottom: 0.75rem;
-    color: white;
-}
-
-.privacy-item p {
-    font-size: 1rem;
-    line-height: 1.6;
-    opacity: 0.95;
-    margin: 0;
-}
-
-/* Datenschutz-Versprechen: Hervorgehobene Box am Ende */
-.privacy-guarantee {
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(10px);
-    padding: 2.5rem;
-    border-radius: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    text-align: left;
-}
-
-.privacy-guarantee h3 {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-    color: white;
-}
-
-.privacy-guarantee p {
-    font-size: 1.1rem;
-    line-height: 1.8;
-    opacity: 0.95;
-    margin: 0;
-}
-
-
-/* =============================================================================
-   17. FOOTER
-   =============================================================================
-   Dunkler Footer am Seitenende mit:
-   - 4-Spalten-Grid (Produkt, Rechtliches, Formate, Entwickler)
-   - Copyright-Zeile mit Links (Impressum, Datenschutz, GitHub)
-   - Gruener Datenschutz-Hinweis
-   ============================================================================= */
-
-footer {
-    background: linear-gradient(135deg, #1e293b, #0f172a);  /* Sehr dunkles Blaugrau */
-    color: white;
-    padding: 3rem 0 2rem;
-    margin-top: 3rem;
+.btn--primary {
     width: 100%;
+    min-height: 54px;
+    border-color: var(--blue);
+    background: var(--blue);
+    color: var(--paper);
+    font-size: 1.08rem;
+    font-weight: 750;
 }
 
-/* 4-Spalten-Grid fuer Footer-Inhalte */
-.footer-content {
-    max-width: 1200px;
-    margin: 0 auto 2rem;
-    padding: 0 2rem;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 3rem;
+.btn--primary:hover {
+    background: var(--blue-hover);
+    border-color: var(--blue-hover);
 }
 
-.footer-section h3 {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-    color: white;
+.btn--primary:disabled {
+    border-color: var(--rule);
+    background: var(--rule);
+    color: var(--ink-muted);
+    cursor: not-allowed;
 }
 
-/* Spalten-Ueberschriften: Grau, Grossbuchstaben */
-.footer-section h4 {
-    font-size: 1.1rem;
-    margin-bottom: 0.75rem;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-weight: 600;
+/* ---------- Ihre Datei ---------- */
+
+.file {
+    position: sticky;
+    top: 24px;
+    margin-top: 36px;
 }
 
-.footer-section p {
-    color: #94a3b8;
-    line-height: 1.6;
-    margin: 0.5rem 0;
+.file__sheet {
+    position: relative;
+    padding: 26px 24px 22px;
+    border-top: 5px solid var(--blue);
+    border-radius: 3px 3px 12px 12px;
+    background: var(--paper);
+    box-shadow:
+        0 1px 2px rgba(23, 32, 42, 0.08),
+        0 18px 40px -16px rgba(11, 61, 145, 0.35);
 }
 
-.footer-section ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+.file__title {
+    font-size: 1.2rem;
 }
 
-.footer-section li {
-    color: #cbd5e1;
-    margin-bottom: 0.5rem;
+.file__name {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--surface);
+    font-family: var(--font-code);
+    font-size: 0.86rem;
+    overflow-wrap: anywhere;
+}
+
+.file__facts {
+    margin: 18px 0 0;
+}
+
+.file__facts > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 9px 0;
+    border-bottom: 1px dotted var(--rule);
+}
+
+.file__facts dt {
+    color: var(--ink-muted);
     font-size: 0.95rem;
 }
 
-/* Entwickler-Link: Weiss, wird blau beim Hover */
-.footer-link {
-    display: inline-block;
-    color: white;
-    text-decoration: none;
-    font-size: 1.2rem;
-    margin-bottom: 0.5rem;
-    transition: all 0.3s ease;
+.file__facts dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 650;
+    overflow-wrap: anywhere;
 }
 
-.footer-link:hover {
-    color: var(--primary-color);
-    transform: translateX(4px);
+.file__facts .file__total {
+    border-bottom: 0;
+    padding-top: 14px;
 }
 
-.footer-tagline {
+.file__total dt {
+    color: var(--ink);
+    font-weight: 650;
+}
+
+.file__total dd {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.file__missing:not(:empty) {
+    margin: 6px 0 14px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    background: var(--surface);
+    font-size: 0.92rem;
+}
+
+.file__missing ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+}
+
+.file__missing:empty + .btn {
+    margin-top: 10px;
+}
+
+.file__secure {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    color: var(--green);
     font-size: 0.9rem;
-    font-style: italic;
+    font-weight: 600;
+    line-height: 1.4;
 }
 
-/* Footer-Bottom: Trennlinie und zentrierte Links */
-.footer-bottom {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem 2rem 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+.file__secure .icon {
+    margin-top: 1px;
+    font-size: 1.1rem;
+}
+
+.file__note {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dotted var(--rule);
+    color: var(--ink-muted);
+    font-size: 0.88rem;
+}
+
+/* ---------- Inhalte ---------- */
+
+.content {
+    padding-top: 24px;
+    padding-bottom: 88px;
+}
+
+.content > section {
+    max-width: 74ch;
+    padding-top: 56px;
+}
+
+.content h2 {
+    font-size: clamp(1.55rem, 1.2rem + 1vw, 1.95rem);
+    margin-bottom: 16px;
+}
+
+.content p + p,
+.content p + .table-scroll,
+.content .table-scroll + p {
+    margin-top: 16px;
+}
+
+.content p {
+    line-height: 1.65;
+}
+
+.howto {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: howto;
+}
+
+.howto li {
+    position: relative;
+    padding: 0 0 20px 52px;
+    line-height: 1.6;
+    counter-increment: howto;
+}
+
+.howto li::before {
+    content: counter(howto);
+    position: absolute;
+    left: 0;
+    top: -2px;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--blue);
+    border-radius: 7px;
+    color: var(--blue);
+    font-weight: 800;
+}
+
+.formats td:first-child {
+    white-space: nowrap;
+}
+
+.content h3 {
+    margin: 36px 0 10px;
+    font-size: 1.2rem;
+}
+
+/* Sicherheit und Qualitaet: belegbare Aussagen, je mit Haken */
+.trust {
+    margin: 8px 0 0;
+    border-top: 1px solid var(--rule);
+}
+
+.trust > div {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr);
+    gap: 6px 28px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+}
+
+.trust dt {
+    display: flex;
+    gap: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.trust dt::before {
+    content: "";
+    flex: none;
+    width: 14px;
+    height: 8px;
+    margin-top: 5px;
+    border-left: 2.5px solid var(--green);
+    border-bottom: 2.5px solid var(--green);
+    transform: rotate(-45deg);
+}
+
+.trust dd {
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* Aenderungsprotokoll als Zeitleiste */
+.changelog {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    border-left: 2px solid var(--rule);
+}
+
+.changelog li {
+    position: relative;
+    padding: 0 0 24px 26px;
+}
+
+.changelog li:last-child {
+    padding-bottom: 4px;
+}
+
+.changelog li::before {
+    content: "";
+    position: absolute;
+    left: -7px;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--blue);
+    border-radius: 50%;
+    background: var(--paper);
+}
+
+.changelog li:first-child::before {
+    background: var(--blue);
+}
+
+.changelog time {
+    font-weight: 700;
+}
+
+.changelog p {
+    margin-top: 2px;
+}
+
+.faq {
+    border-bottom: 1px solid var(--rule);
+}
+
+.faq details {
+    border-top: 1px solid var(--rule);
+}
+
+.faq summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 0;
+    font-weight: 650;
+    font-size: 1.06rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.faq summary::-webkit-details-marker {
+    display: none;
+}
+
+.faq summary::after {
+    content: "+";
+    flex: none;
+    width: 24px;
+    color: var(--blue);
+    font-size: 1.4rem;
+    line-height: 1;
     text-align: center;
 }
 
-.footer-bottom p {
-    color: #94a3b8;
-    margin: 0.5rem 0;
+.faq details[open] summary::after {
+    content: "\2212";
 }
 
-/* Gruener Datenschutz-Hinweis */
-.footer-privacy {
-    font-weight: 600;
-    color: var(--success-color);
+.faq summary:hover {
+    color: var(--blue);
 }
 
-.footer-links {
-    margin: 0.75rem 0;
+.faq details p {
+    padding-bottom: 20px;
+    color: var(--ink);
 }
 
-/* Footer-Links: Grau, werden weiss beim Hover */
-.footer-links a {
-    color: #94a3b8;
-    text-decoration: none;
-    transition: color 0.3s ease;
-    font-size: 0.95rem;
+/* ---------- Fusszeile ---------- */
+
+.site-footer {
+    border-top: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-muted);
+    font-size: 0.93rem;
 }
 
-.footer-links a:hover {
-    color: white;
-    text-decoration: underline;
+.site-footer__inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px 32px;
+    padding-block: 28px;
 }
 
+.site-footer nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+}
 
-/* =============================================================================
-   18. RESPONSIVE DESIGN
-   =============================================================================
-   Media Queries fuer Tablet (max 768px) und Mobil (max 480px).
+.site-footer a {
+    color: var(--ink-muted);
+}
 
-   Aenderungen bei 768px:
-   - Hero: Kleinere Schriftgroessen, 1-Spalten-Grid
-   - Formular: 1-Spalte statt 2
-   - Tabs: Vertikal statt horizontal
-   - Tabelle: Kleinere Schrift
-   - Footer: 1-Spalte
+.site-footer a:hover {
+    color: var(--ink);
+}
 
-   Aenderungen bei 480px:
-   - Noch kleinere Schriftgroessen
-   - Kompaktere Padding-Werte
-   ============================================================================= */
+/* ---------- Meldungen (Toasts) ---------- */
 
-/* ---- Tablet-Breakpoint: max 768px ---- */
-@media (max-width: 768px) {
-    body {
-        padding: 0;
+/* Unten links: rechts steht auf grossen Bildschirmen das Blatt "Ihre Datei" */
+.toasts {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: grid;
+    gap: 10px;
+    width: min(420px, calc(100vw - 40px));
+    pointer-events: none;
+}
+
+.toast {
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    background: var(--ink);
+    color: var(--paper);
+    font-weight: 500;
+    line-height: 1.45;
+    box-shadow: 0 12px 28px -10px rgba(23, 32, 42, 0.45);
+    pointer-events: auto;
+    animation: toast-in 0.2s ease-out;
+}
+
+.toast--info {
+    background: var(--blue);
+}
+
+.toast.is-leaving {
+    animation: toast-out 0.2s ease-in forwards;
+}
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes toast-out {
+    to { opacity: 0; transform: translateY(8px); }
+}
+
+/* ---------- Kleinere Bildschirme ---------- */
+
+@media (max-width: 980px) {
+    .intro {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 32px;
     }
 
-    /* Hero: Kompakteres Padding und kleinere Schrift */
-    .hero-section {
-        padding: 3rem 1.5rem 2rem;
+    .flow {
+        max-width: 560px;
     }
 
-    .hero-content h1 {
-        font-size: 2.5rem;
-    }
-
-    .hero-subtitle {
-        font-size: 1.1rem;
-    }
-
-    /* Features: 1 Spalte statt 4 */
-    .hero-features {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .hero-feature {
-        padding: 1.25rem;
-    }
-
-    .cta-button {
-        padding: 1rem 2rem;
-        font-size: 1rem;
-    }
-
-    /* Trust-Bereich: 1 Spalte */
-    .trust-section {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-        padding: 2rem 1.5rem;
-    }
-
-    /* Header: Weniger Abstand */
-    header {
-        margin: 2rem 1rem;
-        padding: 2rem 1.5rem;
-    }
-
-    header h2 {
-        font-size: 2rem;
-    }
-
-    /* Schritte-Uebersicht: 1 Spalte */
-    .steps-overview {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    /* Hauptbereich: Weniger Padding */
-    main {
-        padding: 2rem 1.5rem;
-        margin: 1rem;
-    }
-
-    .step-section {
-        padding: 1.5rem 1.25rem;
-        margin: 1.25rem 0;
-    }
-
-    /* Kleinere Schrittnummern */
-    .step-number {
-        width: 40px;
-        height: 40px;
-        font-size: 1.5rem;
-    }
-
-    .step-header h2 {
-        font-size: 1.5rem;
-    }
-
-    /* Zahlungsart-Buttons: 1 Spalte */
-    .payment-type-buttons {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .payment-type-btn {
-        padding: 1.75rem 1.25rem;
-    }
-
-    .form-section {
-        padding: 1.25rem;
-    }
-
-    /* Formular: 1 Spalte statt 2 */
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
-
-    /* Tabs: Vertikal statt horizontal */
-    .input-method-tabs {
-        flex-direction: column;
+    .generator {
+        grid-template-columns: minmax(0, 1fr);
         gap: 0;
-        border-bottom: none;
     }
 
-    .input-tab {
-        border-bottom: 2px solid #e0e0e0;
-        border-radius: 0;
-    }
-
-    .manual-entry-form {
-        padding: 1.25rem;
-    }
-
-    .upload-section {
-        padding: 1rem 0;
-    }
-
-    .file-label {
-        padding: 2rem 1.25rem;
-    }
-
-    .preview-section {
-        padding: 1.5rem 1.25rem;
-    }
-
-    /* Tabelle: Kleinere Schrift auf schmalen Bildschirmen */
-    .table-wrapper {
-        font-size: 0.85rem;
-    }
-
-    th, td {
-        padding: 0.75rem 0.5rem;
-    }
-
-    /* Konfigurationsverwaltung: Kompakter */
-    .config-management {
-        padding: 1.5rem;
-    }
-
-    /* Info-Bereich: Vertikal statt horizontal */
-    .config-info {
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .info-icon {
-        font-size: 2.5rem;
-    }
-
-    /* Buttons: Vertikal statt horizontal */
-    .config-buttons {
-        flex-direction: column;
-    }
-
-    /* Excel-Anleitung: Kompakter */
-    .excel-instructions {
-        padding: 1.5rem;
-    }
-
-    .instruction-header h3 {
-        font-size: 1.2rem;
-    }
-
-    .instruction-icon {
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    /* Anleitungsschritte: 1 Spalte, Pfeile nach unten statt rechts */
-    .instruction-steps {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .instruction-step {
-        padding: 1.5rem 1rem;
-    }
-
-    /* Pfeil zeigt nach unten statt nach rechts */
-    .instruction-step:not(:last-child)::after {
-        content: '↓';
-        right: 50%;
-        top: auto;
-        bottom: -1rem;
-        transform: translateX(50%);
-    }
-
-    .step-content strong {
-        font-size: 1rem;
-    }
-
-    .step-content p {
-        font-size: 0.9rem;
-    }
-
-    /* Datenschutz: Weniger Padding */
-    .privacy-section {
-        margin: 2rem 1rem;
-        padding: 2.5rem 1.5rem;
-    }
-
-    .privacy-section h2 {
-        font-size: 2rem;
-    }
-
-    /* Datenschutz-Features: 1 Spalte */
-    .privacy-features {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-    }
-
-    .privacy-item {
-        padding: 1.5rem;
-    }
-
-    /* FAQ: Weniger Padding */
-    .faq-section {
-        padding: 1.5rem 1.25rem;
-    }
-
-    .faq-section h2 {
-        font-size: 1.5rem;
-    }
-
-    .faq-question {
-        padding: 1.5rem;
-    }
-
-    /* Footer: 1 Spalte */
-    .footer-content {
-        grid-template-columns: 1fr;
-        gap: 2rem;
+    .file {
+        position: static;
+        margin-top: 8px;
     }
 }
 
-/* ---- Mobil-Breakpoint: max 480px ---- */
-@media (max-width: 480px) {
-    /* Noch kleinere Schriftgroessen */
-    .hero-content h1 {
-        font-size: 2rem;
+@media (max-width: 720px) {
+    .site-nav {
+        display: none;
     }
 
-    .hero-subtitle {
-        font-size: 1rem;
+    .intro {
+        padding-top: 36px;
+        padding-bottom: 28px;
     }
 
-    .hero-badge {
-        font-size: 0.8rem;
-        padding: 0.4rem 1rem;
-    }
-
-    .payment-type-btn {
-        padding: 1.5rem 1rem;
-    }
-
-    .payment-type-btn strong {
+    .intro__lead {
         font-size: 1.1rem;
     }
+}
 
-    /* Kompaktere Buttons */
-    .btn {
-        padding: 1rem 1.5rem;
-        font-size: 1rem;
+@media (max-width: 600px) {
+    .wrap {
+        padding-inline: 16px;
     }
 
-    .faq-question h4 {
-        font-size: 1rem;
+    .choice,
+    .fields,
+    .trust > div {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .faq-answer-content {
-        padding: 0 1.5rem 1.5rem;
-        font-size: 1rem;
+    .step {
+        padding-block: 28px;
     }
 
-    .privacy-section h2 {
-        font-size: 1.75rem;
+    .step__title {
+        font-size: 1.3rem;
     }
 
-    .privacy-lead {
-        font-size: 1.1rem;
+    .file__sheet {
+        padding-inline: 18px;
+    }
+
+    /* Zahlungsliste als Bloecke statt Tabelle: Name und Betrag oben,
+       darunter IBAN, Verwendungszweck und "Entfernen" – kein seitliches
+       Scrollen auf dem Handy. */
+    #previewTable thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+    }
+
+    #previewTable,
+    #previewTable tbody {
+        display: block;
+    }
+
+    #previewTable tr {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        column-gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--rule);
+    }
+
+    #previewTable tr:last-child {
+        border-bottom: 0;
+    }
+
+    #previewTable td {
+        padding: 0;
+        border: 0;
+    }
+
+    #previewTable td:nth-child(1) { grid-area: 1 / 1; color: var(--ink-muted); }
+    #previewTable td:nth-child(2) { grid-area: 1 / 2; }
+    #previewTable td:nth-child(4) { grid-area: 1 / 3; font-weight: 650; }
+    #previewTable td:nth-child(3) { grid-area: 2 / 2 / 3 / 4; margin-top: 6px; }
+    #previewTable td:nth-child(5) { grid-area: 3 / 2 / 4 / 4; margin-top: 4px; width: auto; }
+
+    #previewTable .cell-sub.code {
+        white-space: normal;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
     }
 }
